@@ -117,3 +117,44 @@ def test_coder_eval_synthetic_task_is_loadable(tmp_path: Path) -> None:
     tasks = list(bench.iter_tasks(limit=1))
     assert tasks[0].task_id == "smoke-001"
     assert tasks[0].expected == {"stdout_contains": "5"}
+
+
+def test_base_grade_default_falls_back_to_exit_code(tmp_path: Path) -> None:
+    """When ``expected`` is None, ``grade`` returns True iff exit_code == 0."""
+
+    from agents.base import ExecutionResult
+    from benchmarks.base import JSONManifestBenchmark, TaskSpec
+
+    class _T(JSONManifestBenchmark):
+        name = "tmp-test"
+        source_path = tmp_path
+
+        def _synthetic_tasks(self) -> list[TaskSpec]:
+            return []
+
+    bench = _T()
+    ok = ExecutionResult(harness="x", benchmark="", task_id="", exit_code=0, duration_seconds=0.0)
+    bad = ExecutionResult(harness="x", benchmark="", task_id="", exit_code=1, duration_seconds=0.0)
+    assert bench.grade(ok, expected=None) is True
+    assert bench.grade(bad, expected=None) is False
+
+
+def test_base_grade_expected_default_requires_nonzero_expected(tmp_path: Path) -> None:
+    """Base ``_grade_expected`` treats any non-None expected as a pass signal
+    when exit_code == 0; failing harness with expected set = fail."""
+
+    from agents.base import ExecutionResult
+    from benchmarks.base import JSONManifestBenchmark, TaskSpec
+
+    class _T(JSONManifestBenchmark):
+        name = "tmp-test"
+        source_path = tmp_path
+
+        def _synthetic_tasks(self) -> list[TaskSpec]:
+            return []
+
+    bench = _T()
+    ok = ExecutionResult(harness="x", benchmark="", task_id="", exit_code=0, duration_seconds=0.0)
+    bad = ExecutionResult(harness="x", benchmark="", task_id="", exit_code=2, duration_seconds=0.0)
+    assert bench.grade(ok, expected={"anything": 1}) is True
+    assert bench.grade(bad, expected={"anything": 1}) is False

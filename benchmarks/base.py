@@ -109,5 +109,13 @@ class JSONManifestBenchmark(BaseBenchmark):
         return self._grade_expected(result, expected)
 
     def _grade_expected(self, result: ExecutionResult, expected: Any) -> bool:
-        """Hook for subclass-specific grading when ``expected`` is set."""
-        return result.exit_code == 0
+        """Hook for subclass-specific grading when ``expected`` is set.
+
+        Default fallback for benchmarks that didn't override this hook:
+        treat a non-None ``expected`` as a sentinel "the task had a
+        reference output we don't know how to check" and pass when the
+        harness exited cleanly. Subclasses override to enforce
+        benchmark-specific semantics (stdout_contains, file diff, shell
+        verification, etc.).
+        """
+        return expected is not None and result.exit_code == 0
