@@ -26,7 +26,12 @@ class TerminalBenchAdapter(JSONManifestBenchmark):
             )
         ]
 
-    def _grade_expected(self, result: ExecutionResult, expected: dict) -> bool:
+    def _grade_expected(
+        self,
+        result: ExecutionResult,
+        expected: dict,
+        cwd: Path | None = None,
+    ) -> bool:
         if result.exit_code != 0:
             return False
 
@@ -34,7 +39,12 @@ class TerminalBenchAdapter(JSONManifestBenchmark):
         if cmd:
             try:
                 proc = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True, timeout=30
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=30,
                 )
                 return proc.returncode == 0
             except subprocess.TimeoutExpired:

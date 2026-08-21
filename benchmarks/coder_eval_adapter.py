@@ -32,7 +32,12 @@ class CoderEvalAdapter(JSONManifestBenchmark):
             )
         ]
 
-    def _grade_expected(self, result: ExecutionResult, expected: dict) -> bool:
+    def _grade_expected(
+        self,
+        result: ExecutionResult,
+        expected: dict,
+        cwd: Path | None = None,
+    ) -> bool:
         if result.exit_code != 0:
             return False
 

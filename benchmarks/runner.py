@@ -206,7 +206,7 @@ class BenchmarkRunner:
                 result.task_id = task.task_id
                 result.plugins = list(plugins)
                 result.mcp_servers = list(mcp_servers)
-                result.passed = benchmark.grade(result, task.expected)
+                result.passed = benchmark.grade(result, task.expected, cwd=cwd)
                 if (result.tokens_input is not None or result.tokens_output is not None) and result.tokens_total is None:
                     result.tokens_total = (result.tokens_input or 0) + (result.tokens_output or 0)
                 if result.tokens_total is not None and result.cost_usd is None:

@@ -98,7 +98,12 @@ class JSONManifestBenchmark(BaseBenchmark):
 
     # ---- default grading ----
 
-    def grade(self, result: ExecutionResult, expected: Any) -> bool:
+    def grade(
+        self,
+        result: ExecutionResult,
+        expected: Any,
+        cwd: Path | None = None,
+    ) -> bool:
         """Default grader: pass iff exit_code == 0 when no expected is attached.
 
         Subclasses override for benchmark-specific checks (stdout
@@ -106,16 +111,13 @@ class JSONManifestBenchmark(BaseBenchmark):
         """
         if expected is None:
             return result.exit_code == 0
-        return self._grade_expected(result, expected)
+        return self._grade_expected(result, expected, cwd=cwd)
 
-    def _grade_expected(self, result: ExecutionResult, expected: Any) -> bool:
-        """Hook for subclass-specific grading when ``expected`` is set.
-
-        Default fallback for benchmarks that didn't override this hook:
-        treat a non-None ``expected`` as a sentinel "the task had a
-        reference output we don't know how to check" and pass when the
-        harness exited cleanly. Subclasses override to enforce
-        benchmark-specific semantics (stdout_contains, file diff, shell
-        verification, etc.).
-        """
+    def _grade_expected(
+        self,
+        result: ExecutionResult,
+        expected: Any,
+        cwd: Path | None = None,
+    ) -> bool:
+        """Hook for subclass-specific grading when ``expected`` is set."""
         return expected is not None and result.exit_code == 0

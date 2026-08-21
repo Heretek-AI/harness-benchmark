@@ -21,62 +21,71 @@ from typing import Any
 
 
 def call_llm(api_base: str, api_key: str, model: str, prompt: str) -> dict[str, Any]:
-    """Invoke LLM via OpenAI or Anthropic compatible API."""
+    """Invoke LLM via OpenAI or Anthropic compatible API, auto-detecting protocol."""
     base = (api_base or "http://localhost:4000/v1").rstrip("/")
-    is_anthropic = "anthropic" in base.lower() or "claude" in (model or "").lower()
+    target_model = model or "MiniMax-M3"
 
-    if is_anthropic:
-        url = f"{base}/v1/messages" if not base.endswith("/messages") else base
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
-        }
-        payload = {
-            "model": model or "claude-3-7-sonnet",
-            "max_tokens": 4096,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    else:
-        url = f"{base}/chat/completions" if not base.endswith("/chat/completions") else base
-        if not url.endswith("/chat/completions") and not url.endswith("/completions"):
-            url = f"{url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
-        }
-        payload = {
-            "model": model or "gpt-4o",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert AI coding assistant. Solve the user's task directly. "
-                        "When writing code or files, provide complete working code blocks. "
-                        "If you execute a command or produce a result, show the final output."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.0,
-        }
+    headers_anthropic = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "Authorization": f"Bearer {api_key}",
+        "anthropic-version": "2023-06-01",
+        "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
+    }
+    payload_anthropic = {
+        "model": target_model,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}],
+    }
 
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
+    headers_openai = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
+    }
+    payload_openai = {
+        "model": target_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert AI coding assistant. Solve the user's task directly. "
+                    "When writing code or files, provide complete working code blocks. "
+                    "If you execute a command or produce a result, show the final output."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.0,
+    }
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body)
-    except urllib.error.HTTPError as exc:
-        err_body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code} from {url}: {err_body}") from exc
+    candidates = [
+        (f"{base}/messages", headers_anthropic, payload_anthropic),
+        (f"{base}/v1/messages", headers_anthropic, payload_anthropic),
+        (f"{base}/chat/completions", headers_openai, payload_openai),
+        (f"{base}/v1/chat/completions", headers_openai, payload_openai),
+    ]
+
+    last_error = None
+    for url, headers, payload in candidates:
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                body = resp.read().decode("utf-8")
+                if body.strip():
+                    return json.loads(body)
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    if last_error:
+        raise last_error
+    raise RuntimeError(f"Failed to query LLM endpoint at {base}")
 
 
 def parse_response(data: dict[str, Any]) -> tuple[str, int, int]:
