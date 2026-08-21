@@ -2,19 +2,18 @@
 
 SKELETON — OpenCode reads its config from ``~/.config/opencode/config.json``
 or the path in ``OPENCODE_CONFIG``. See ``review/agents/opencode/`` for the
-real schema.
+real schema. Subprocess spawning + ExecutionResult construction are
+inherited from ``BaseAgentAdapter``; we only override ``_on_setup``
+(config-file materialisation + ``OPENCODE_CONFIG`` env) and
+``_build_command`` (the ``opencode --non-interactive <prompt>`` argv shape).
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
-import subprocess
-import time
-from pathlib import Path
 
-from agents.base import AdapterContext, BaseAgentAdapter, ExecutionResult
+from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class OpenCodeAdapter(BaseAgentAdapter):
@@ -40,46 +39,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
         cfg_path.write_text(json.dumps(cfg, indent=2))
         ctx.extra_env["OPENCODE_CONFIG"] = str(cfg_path)
 
-    def _on_execute_task(
-        self,
-        prompt: str,
-        workspace_dir: Path,
-        timeout: int,
-    ) -> ExecutionResult:
-        start = time.monotonic()
-        try:
-            proc = subprocess.run(
-                [self.cli_binary, "--non-interactive", prompt],
-                cwd=str(workspace_dir),
-                env=self.full_env(),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-            return ExecutionResult(
-                harness=self.name,
-                benchmark="",
-                task_id="",
-                plugins=[],
-                mcp_servers=[],
-                exit_code=-1,
-                duration_seconds=time.monotonic() - start,
-                stdout="",
-                stderr=str(exc),
-                error=type(exc).__name__,
-            )
-        return ExecutionResult(
-            harness=self.name,
-            benchmark="",
-            task_id="",
-            plugins=[],
-            mcp_servers=[],
-            exit_code=proc.returncode,
-            duration_seconds=time.monotonic() - start,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
-        )
+    def _build_command(self, prompt: str, workspace_dir) -> list[str]:
+        return [self.cli_binary, "--non-interactive", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:

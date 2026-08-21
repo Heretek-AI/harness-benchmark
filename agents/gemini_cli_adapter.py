@@ -3,18 +3,20 @@
 SKELETON — Gemini reads MCP servers from ``gemini-extension.json`` files in
 the workspace. See ``review/agents/gemini-cli/gemini-extension.json`` for
 the real schema; we write a minimal one when MCPs are requested.
+Subprocess spawning + ExecutionResult construction are inherited from
+``BaseAgentAdapter``; we only override ``_on_setup`` (extension-file
+materialisation) and ``_build_command`` (the ``gemini run <prompt>`` argv
+shape).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
-import subprocess
-import time
-from pathlib import Path
-from typing import Any
+from pathlib import Path as _P
 
-from agents.base import AdapterContext, BaseAgentAdapter, ExecutionResult
+from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class GeminiCLIAdapter(BaseAgentAdapter):
@@ -28,13 +30,10 @@ class GeminiCLIAdapter(BaseAgentAdapter):
         mcp_servers: list[str],
     ) -> None:
         if mcp_servers and mcp_servers != ["none"]:
-            ext: dict[str, Any] = {"name": "harness-bench", "mcpServers": {}}
+            ext: dict = {"name": "harness-bench", "mcpServers": {}}
             for name in mcp_servers:
                 # The runner passes the registry path via env; we read it
                 # here to mirror Claude Code's approach.
-                import os
-                from pathlib import Path as _P
-
                 registry_path = os.environ.get("HARNESS_BENCH_MCP_REGISTRY")
                 if registry_path is None:
                     candidate = (
@@ -58,46 +57,8 @@ class GeminiCLIAdapter(BaseAgentAdapter):
                 json.dumps(ext, indent=2)
             )
 
-    def _on_execute_task(
-        self,
-        prompt: str,
-        workspace_dir: Path,
-        timeout: int,
-    ) -> ExecutionResult:
-        start = time.monotonic()
-        try:
-            proc = subprocess.run(
-                [self.cli_binary, "run", prompt],
-                cwd=str(workspace_dir),
-                env=self.full_env(),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-            return ExecutionResult(
-                harness=self.name,
-                benchmark="",
-                task_id="",
-                plugins=[],
-                mcp_servers=[],
-                exit_code=-1,
-                duration_seconds=time.monotonic() - start,
-                stdout="",
-                stderr=str(exc),
-                error=type(exc).__name__,
-            )
-        return ExecutionResult(
-            harness=self.name,
-            benchmark="",
-            task_id="",
-            plugins=[],
-            mcp_servers=[],
-            exit_code=proc.returncode,
-            duration_seconds=time.monotonic() - start,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
-        )
+    def _build_command(self, prompt: str, workspace_dir) -> list[str]:
+        return [self.cli_binary, "run", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:

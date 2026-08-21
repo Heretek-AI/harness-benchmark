@@ -16,10 +16,11 @@ import abc
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -146,14 +147,79 @@ class BaseAgentAdapter(abc.ABC):
     ) -> None:
         """Materialize harness-specific config (files, plugin mounts, mcp-config)."""
 
-    @abc.abstractmethod
+    def _build_command(
+        self,
+        prompt: str,
+        workspace_dir: Path,
+    ) -> list[str]:
+        """Return the argv for the harness subprocess.
+
+        Default: ``[cli_binary, prompt]``. Override per harness to insert
+        flags like ``run``, ``--task``, ``--non-interactive``, ``--plugin-dir``,
+        ``--mcp-config``, ``--verbose``, etc.
+        """
+        return [self.cli_binary, prompt]
+
     def _on_execute_task(
         self,
         prompt: str,
         workspace_dir: Path,
         timeout: int,
     ) -> ExecutionResult:
-        """Spawn the harness subprocess and capture its output."""
+        """Spawn the harness subprocess and capture its output.
+
+        Default impl runs ``self._build_command(prompt, workspace_dir)``
+        through ``self._run_cli``, which handles timing, error capture,
+        and ``ExecutionResult`` construction. Override only when you need
+        non-default behaviour (e.g., Claude Code parses ``--verbose`` JSONL
+        after the subprocess completes).
+        """
+        return self._run_cli(
+            self._build_command(prompt, workspace_dir), workspace_dir, timeout
+        )
+
+    def _run_cli(
+        self,
+        cmd: list[str],
+        workspace_dir: Path,
+        timeout: int,
+    ) -> ExecutionResult:
+        """Spawn ``cmd`` and translate its outcome into an ``ExecutionResult``.
+
+        Always returns a result, even on ``FileNotFoundError`` (CLI missing
+        on PATH) or ``TimeoutExpired`` — the runner records these as failed
+        rather than crashing the whole sweep.
+        """
+        start = time.monotonic()
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(workspace_dir),
+                env=self.full_env(),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            return ExecutionResult(
+                harness=self.name,
+                benchmark="",
+                task_id="",
+                exit_code=-1,
+                duration_seconds=time.monotonic() - start,
+                stdout="",
+                stderr=str(exc),
+                error=type(exc).__name__,
+            )
+        return ExecutionResult(
+            harness=self.name,
+            benchmark="",
+            task_id="",
+            exit_code=proc.returncode,
+            duration_seconds=time.monotonic() - start,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+        )
 
     # ---- helpers for subclasses ----
 

@@ -1,5 +1,5 @@
 """Re-exports."""
-from benchmarks.base import BaseBenchmark, TaskSpec
+from benchmarks.base import BaseBenchmark, JSONManifestBenchmark, TaskSpec
 from benchmarks.coder_eval_adapter import CoderEvalAdapter
 from benchmarks.terminal_bench_adapter import TerminalBenchAdapter
 
@@ -21,6 +21,7 @@ def resolve_benchmark(name: str) -> BaseBenchmark:
 __all__ = [
     "BaseBenchmark",
     "CoderEvalAdapter",
+    "JSONManifestBenchmark",
     "REGISTRY",
     "TaskSpec",
     "TerminalBenchAdapter",

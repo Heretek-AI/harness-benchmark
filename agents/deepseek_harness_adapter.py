@@ -3,16 +3,16 @@
 SKELETON — both harnesses are LiteLLM-compatible and read ``OPENAI_API_KEY``
 + ``OPENAI_BASE`` from env. The CLI's real flag set lives in
 ``review/agents/deepseek-harness`` / ``review/agents/DeepSeek-Reasonix``.
+Subprocess spawning + ExecutionResult construction are inherited from
+``BaseAgentAdapter``; we only override ``_on_setup`` (env-var mapping) and
+``_build_command`` (the ``deepseek --task <prompt>`` argv shape).
 """
 
 from __future__ import annotations
 
 import shutil
-import subprocess
-import time
-from pathlib import Path
 
-from agents.base import AdapterContext, BaseAgentAdapter, ExecutionResult
+from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class DeepSeekHarnessAdapter(BaseAgentAdapter):
@@ -29,46 +29,8 @@ class DeepSeekHarnessAdapter(BaseAgentAdapter):
         # runner maps LLM_API -> OPENAI_BASE and LLM_KEY -> OPENAI_API_KEY.
         ctx.extra_env.setdefault("OPENAI_BASE", "${LLM_API}")
 
-    def _on_execute_task(
-        self,
-        prompt: str,
-        workspace_dir: Path,
-        timeout: int,
-    ) -> ExecutionResult:
-        start = time.monotonic()
-        try:
-            proc = subprocess.run(
-                [self.cli_binary, "--task", prompt],
-                cwd=str(workspace_dir),
-                env=self.full_env(),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-            return ExecutionResult(
-                harness=self.name,
-                benchmark="",
-                task_id="",
-                plugins=[],
-                mcp_servers=[],
-                exit_code=-1,
-                duration_seconds=time.monotonic() - start,
-                stdout="",
-                stderr=str(exc),
-                error=type(exc).__name__,
-            )
-        return ExecutionResult(
-            harness=self.name,
-            benchmark="",
-            task_id="",
-            plugins=[],
-            mcp_servers=[],
-            exit_code=proc.returncode,
-            duration_seconds=time.monotonic() - start,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
-        )
+    def _build_command(self, prompt: str, workspace_dir) -> list[str]:
+        return [self.cli_binary, "--task", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:

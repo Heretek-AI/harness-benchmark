@@ -10,42 +10,18 @@ support (file diffs, multi-step verifications) lands in a follow-up.
 
 from __future__ import annotations
 
-import json
-import logging
 import subprocess
-from collections.abc import Iterator
 from pathlib import Path
 
-from benchmarks.base import BaseBenchmark, TaskSpec
 from agents.base import ExecutionResult
+from benchmarks.base import JSONManifestBenchmark, TaskSpec
 
-logger = logging.getLogger(__name__)
 
-
-class TerminalBenchAdapter(BaseBenchmark):
+class TerminalBenchAdapter(JSONManifestBenchmark):
     name = "terminal-bench"
     source_path = Path("review/benchmarks/harbor")
 
-    def __init__(self, dataset_path: str | Path | None = None) -> None:
-        self.dataset_path = Path(dataset_path) if dataset_path else self.source_path
-        self._tasks: list[TaskSpec] | None = None
-
-    def _load(self) -> list[TaskSpec]:
-        manifest = self.dataset_path / "tasks.json"
-        if manifest.exists():
-            data = json.loads(manifest.read_text())
-            return [
-                TaskSpec(
-                    task_id=item["task_id"],
-                    prompt=item["prompt"],
-                    expected=item.get("expected"),
-                )
-                for item in data
-            ]
-        logger.warning(
-            "terminal-bench dataset not found at %s; using synthetic task",
-            self.dataset_path,
-        )
+    def _synthetic_tasks(self) -> list[TaskSpec]:
         return [
             TaskSpec(
                 task_id="smoke-shell-001",
@@ -54,17 +30,7 @@ class TerminalBenchAdapter(BaseBenchmark):
             )
         ]
 
-    def iter_tasks(self, limit: int = 0) -> Iterator[TaskSpec]:
-        if self._tasks is None:
-            self._tasks = self._load()
-        tasks = self._tasks
-        if limit > 0:
-            tasks = tasks[:limit]
-        yield from tasks
-
-    def grade(self, result: ExecutionResult, expected: dict | None) -> bool:
-        if expected is None:
-            return result.exit_code == 0
+    def _grade_expected(self, result: ExecutionResult, expected: dict) -> bool:
         cmd = expected.get("verify_cmd")
         if cmd:
             try:
