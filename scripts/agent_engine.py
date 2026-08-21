@@ -31,6 +31,7 @@ def call_llm(api_base: str, api_key: str, model: str, prompt: str) -> dict[str, 
             "Content-Type": "application/json",
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
+            "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
         }
         payload = {
             "model": model or "claude-3-7-sonnet",
@@ -44,6 +45,7 @@ def call_llm(api_base: str, api_key: str, model: str, prompt: str) -> dict[str, 
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
+            "User-Agent": "harness-benchmark/1.0 (Linux; x86_64)",
         }
         payload = {
             "model": model or "gpt-4o",
@@ -68,8 +70,13 @@ def call_llm(api_base: str, api_key: str, model: str, prompt: str) -> dict[str, 
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body)
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code} from {url}: {err_body}") from exc
 
 
 def parse_response(data: dict[str, Any]) -> tuple[str, int, int]:
