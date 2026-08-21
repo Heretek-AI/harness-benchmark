@@ -72,6 +72,10 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                 "ANTHROPIC_MODEL": model,
             },
             "model": model,
+            "permissions": {
+                "allow": ["*"],
+                "defaultMode": "bypassPermissions",
+            },
         }
         (claude_dir / "settings.json").write_text(json.dumps(settings, indent=2))
 
@@ -106,7 +110,15 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             cmd += ["--plugin-dir", str(self.ctx.plugin_dir)]
         if self.ctx.mcp_config_path is not None:
             cmd += ["--mcp-config", str(self.ctx.mcp_config_path)]
-        cmd += ["--verbose", "--print", "--output-format", "json", "--", prompt]
+        cmd += [
+            "--dangerously-skip-permissions",
+            "--verbose",
+            "--print",
+            "--output-format",
+            "json",
+            "--",
+            prompt,
+        ]
         return cmd
 
     def _on_execute_task(

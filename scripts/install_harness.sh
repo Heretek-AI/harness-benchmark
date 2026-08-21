@@ -14,6 +14,12 @@ BIN_DIR="${HOME}/.local/bin"
 mkdir -p "${BIN_DIR}"
 export PATH="${BIN_DIR}:${PATH}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/agent_engine.py" ]; then
+  cp -f "${SCRIPT_DIR}/agent_engine.py" "${BIN_DIR}/agent_engine.py"
+  chmod +x "${BIN_DIR}/agent_engine.py"
+fi
+
 install_claude_code() {
   echo "==> Installing Claude Code CLI..."
   if command -v npm >/dev/null 2>&1; then
@@ -73,9 +79,13 @@ install_deepseek_reasonix() {
   fi
 
   if [ ! -f "${BIN_DIR}/reasonix" ]; then
-    echo "Creating fallback shim for reasonix..."
+    echo "Creating Agent Engine fallback runner for reasonix..."
     cat << 'EOF' > "${BIN_DIR}/reasonix"
 #!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${DIR}/agent_engine.py" ]; then
+  exec python3 "${DIR}/agent_engine.py" "$@"
+fi
 echo "DeepSeek-Reasonix CLI wrapper"
 exit 0
 EOF
@@ -111,9 +121,9 @@ EOF
     echo "Creating Agent Engine runner for deepseek / dsh..."
     cat << 'EOF' > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
-if [ -f "${REPO_ROOT}/scripts/agent_engine.py" ]; then
-  exec python3 "${REPO_ROOT}/scripts/agent_engine.py" "$@"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${DIR}/agent_engine.py" ]; then
+  exec python3 "${DIR}/agent_engine.py" "$@"
 fi
 echo "DeepSeek harness CLI wrapper"
 exit 0
@@ -132,9 +142,9 @@ install_antigravity_cli() {
     echo "Creating Agent Engine runner for antigravity / agy..."
     cat << 'EOF' > "${BIN_DIR}/antigravity"
 #!/usr/bin/env bash
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
-if [ -f "${REPO_ROOT}/scripts/agent_engine.py" ]; then
-  exec python3 "${REPO_ROOT}/scripts/agent_engine.py" "$@"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${DIR}/agent_engine.py" ]; then
+  exec python3 "${DIR}/agent_engine.py" "$@"
 fi
 echo "Antigravity CLI wrapper"
 exit 0

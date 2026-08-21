@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from pathlib import Path
 
 from agents.base import AdapterContext, BaseAgentAdapter
 
@@ -87,7 +88,17 @@ class DeepSeekReasonixAdapter(DeepSeekHarnessAdapter):
 
         ctx.extra_env["REASONIX_HOME"] = str(ctx.workspace_dir)
 
-        # Materialize reasonix.toml and config.toml in workspace
+        dotenv_content = (
+            f"REASONIX_API_KEY={api_key}\n"
+            f"DEEPSEEK_API_KEY={api_key}\n"
+            f"OPENAI_API_KEY={api_key}\n"
+        )
+        (ctx.workspace_dir / ".env").write_text(dotenv_content)
+        home_reasonix = Path.home() / ".reasonix"
+        home_reasonix.mkdir(parents=True, exist_ok=True)
+        (home_reasonix / ".env").write_text(dotenv_content)
+
+        # Materialize reasonix.toml and config.toml in workspace and home
         toml_content = f"""# Reasonix benchmark configuration
 default_model = "litellm"
 
@@ -106,6 +117,7 @@ api_key_env = "REASONIX_API_KEY"
 """
         (ctx.workspace_dir / "reasonix.toml").write_text(toml_content)
         (ctx.workspace_dir / "config.toml").write_text(toml_content)
+        (home_reasonix / "config.toml").write_text(toml_content)
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
         return [self.cli_binary, "run", "--auto", "--output-format", "json", prompt]

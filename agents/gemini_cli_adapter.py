@@ -35,8 +35,6 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             ctx.extra_env["GOOGLE_API_KEY"] = api_key
         if api_base:
             ctx.extra_env["GEMINI_API_BASE"] = api_base
-            ctx.extra_env["GOOGLE_GENAI_BASE_URL"] = api_base
-            ctx.extra_env["GOOGLE_GEMINI_BASE_URL"] = api_base
         if model:
             ctx.extra_env["GEMINI_MODEL"] = model
         ctx.extra_env["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
@@ -55,6 +53,9 @@ class GeminiCLIAdapter(BaseAgentAdapter):
                 "format": "json",
             },
             "security": {
+                "auth": {
+                    "type": "gemini-api-key",
+                },
                 "folderTrust": {
                     "enabled": False,
                 },

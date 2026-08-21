@@ -98,17 +98,41 @@ def parse_response(data: dict[str, Any]) -> tuple[str, int, int]:
     return content, tokens_in, tokens_out
 
 
-def execute_workspace_actions(content: str) -> None:
+def execute_workspace_actions(content: str) -> str:
     """Execute bash and python code blocks in the current workspace if present."""
+    extra_stdout = ""
     # Look for bash script blocks to execute
     bash_blocks = re.findall(r"```(?:bash|sh)\s*([\s\S]*?)```", content)
     for block in bash_blocks:
         code = block.strip()
         if code:
             try:
-                subprocess.run(code, shell=True, check=False, timeout=30)
+                proc = subprocess.run(
+                    code, shell=True, capture_output=True, text=True, timeout=30
+                )
+                if proc.stdout:
+                    extra_stdout += "\n" + proc.stdout
             except Exception:
                 pass
+
+    # Look for python blocks to execute
+    py_blocks = re.findall(r"```(?:python|py)\s*([\s\S]*?)```", content)
+    for block in py_blocks:
+        code = block.strip()
+        if code:
+            try:
+                proc = subprocess.run(
+                    [sys.executable, "-c", code],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if proc.stdout:
+                    extra_stdout += "\n" + proc.stdout
+            except Exception:
+                pass
+
+    return extra_stdout
 
 
 def main() -> None:
@@ -147,7 +171,9 @@ def main() -> None:
         try:
             resp_data = call_llm(api_base, api_key, model, prompt)
             content, tokens_in, tokens_out = parse_response(resp_data)
-            execute_workspace_actions(content)
+            extra = execute_workspace_actions(content)
+            if extra:
+                content = content + "\n" + extra
         except Exception as exc:
             # If network call fails in offline test, emit error message
             content = f"Error querying model {model} at {api_base}: {exc}"
