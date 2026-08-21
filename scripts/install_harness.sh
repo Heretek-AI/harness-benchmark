@@ -95,8 +95,11 @@ EOF
 
 install_deepseek_harness() {
   echo "==> Setting up DeepSeek Harness CLI (deepseek)..."
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g tsx || true
+  fi
   local DSH_SRC="review/agents/deepseek-harness"
-  if [ -d "${DSH_SRC}" ] && [ -f "${DSH_SRC}/apps/cli/src/bin.ts" ] && command -v node >/dev/null 2>&1; then
+  if [ -d "${DSH_SRC}" ] && [ -f "${DSH_SRC}/apps/cli/src/bin.ts" ] && command -v node >/dev/null 2>&1 && command -v tsx >/dev/null 2>&1; then
     echo "Creating Node runner shim for deepseek-harness..."
     cat << EOF > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash
@@ -104,20 +107,7 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null || echo '${PWD}')"
 exec node --import tsx/esm "\${REPO_ROOT}/${DSH_SRC}/apps/cli/src/bin.ts" "\$@"
 EOF
     chmod +x "${BIN_DIR}/deepseek"
-  elif command -v git >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
-    echo "Cloning deepseek-harness from upstream..."
-    rm -rf /tmp/deepseek-harness
-    git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git /tmp/deepseek-harness || true
-    if [ -f "/tmp/deepseek-harness/apps/cli/src/bin.ts" ]; then
-      cat << 'EOF' > "${BIN_DIR}/deepseek"
-#!/usr/bin/env bash
-exec node --import tsx/esm /tmp/deepseek-harness/apps/cli/src/bin.ts "$@"
-EOF
-      chmod +x "${BIN_DIR}/deepseek"
-    fi
-  fi
-
-  if [ ! -f "${BIN_DIR}/deepseek" ]; then
+  else
     echo "Creating Agent Engine runner for deepseek / dsh..."
     cat << 'EOF' > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash

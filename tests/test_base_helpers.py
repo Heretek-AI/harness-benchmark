@@ -39,8 +39,10 @@ def test_default_build_command_is_cli_plus_prompt() -> None:
 def test_per_adapter_command_shapes() -> None:
     assert DeepSeekHarnessAdapter()._build_command("p", Path("/x")) == [
         "deepseek",
-        "run",
+        "-p",
         "p",
+        "--output-format",
+        "json",
     ]
     assert DeepSeekReasonixAdapter()._build_command("p", Path("/x")) == [
         "reasonix",
