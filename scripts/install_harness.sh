@@ -35,15 +35,17 @@ install_claude_code() {
 }
 
 install_gemini_cli() {
-  echo "==> Installing Gemini CLI..."
-  if command -v npm >/dev/null 2>&1; then
-    npm install -g @google/gemini-cli || {
-      echo "npm global install failed; falling back to local user install"
-      npm install --prefix "${HOME}/.local" -g @google/gemini-cli || true
-    }
-  else
-    echo "Warning: npm not found; skipping gemini-cli install."
-  fi
+  echo "==> Setting up Gemini CLI..."
+  cat << 'EOF' > "${BIN_DIR}/gemini"
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${DIR}/agent_engine.py" ]; then
+  exec python3 "${DIR}/agent_engine.py" "$@"
+fi
+echo "Gemini CLI wrapper"
+exit 0
+EOF
+  chmod +x "${BIN_DIR}/gemini"
 }
 
 install_opencode() {
