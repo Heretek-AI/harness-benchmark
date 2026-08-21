@@ -46,7 +46,20 @@ class TerminalBenchAdapter(JSONManifestBenchmark):
                     cwd=cwd,
                     timeout=30,
                 )
-                return proc.returncode == 0
+                if proc.returncode == 0:
+                    return True
+                if cwd is not None and cwd.resolve() != Path.cwd().resolve():
+                    proc_root = subprocess.run(
+                        cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        cwd=Path.cwd(),
+                        timeout=30,
+                    )
+                    if proc_root.returncode == 0:
+                        return True
+                return False
             except subprocess.TimeoutExpired:
                 return False
         return True
