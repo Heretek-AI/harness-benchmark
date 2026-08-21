@@ -70,6 +70,19 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                 list(cfg.mcpServers),
             )
 
+    def _build_command(
+        self,
+        prompt: str,
+        workspace_dir: Path,
+    ) -> list[str]:
+        cmd: list[str] = [self.cli_binary]
+        if self.ctx.plugin_dir is not None:
+            cmd += ["--plugin-dir", str(self.ctx.plugin_dir)]
+        if self.ctx.mcp_config_path is not None:
+            cmd += ["--mcp-config", str(self.ctx.mcp_config_path)]
+        cmd += ["--verbose", "--print", "--output-format", "json", "--", prompt]
+        return cmd
+
     def _on_execute_task(
         self,
         prompt: str,
@@ -77,16 +90,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         timeout: int,
     ) -> ExecutionResult:
         ctx = self.ctx
-        cmd: list[str] = [self.cli_binary]
-
-        if ctx.plugin_dir is not None:
-            cmd += ["--plugin-dir", str(ctx.plugin_dir)]
-        if ctx.mcp_config_path is not None:
-            cmd += ["--mcp-config", str(ctx.mcp_config_path)]
-        cmd += ["--verbose", "--print", "--output-format", "json"]
-
-        # ``--`` separates the prompt positional from any earlier flags.
-        cmd += ["--", prompt]
+        cmd = self._build_command(prompt, workspace_dir)
 
         env = self.full_env()
         start = time.monotonic()
@@ -101,6 +105,16 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             )
         except subprocess.TimeoutExpired as exc:
             duration = time.monotonic() - start
+            stdout = (
+                exc.stdout.decode("utf-8", errors="replace")
+                if isinstance(exc.stdout, bytes)
+                else (exc.stdout or "")
+            )
+            stderr = (
+                exc.stderr.decode("utf-8", errors="replace")
+                if isinstance(exc.stderr, bytes)
+                else (exc.stderr or "")
+            )
             return ExecutionResult(
                 harness=self.name,
                 benchmark="",
@@ -109,8 +123,8 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                 mcp_servers=list(ctx.mcp_servers),
                 exit_code=-1,
                 duration_seconds=duration,
-                stdout=exc.stdout or "",
-                stderr=(exc.stderr or "") + f"\n[timeout after {timeout}s]",
+                stdout=stdout,
+                stderr=stderr + f"\n[timeout after {timeout}s]",
                 error="timeout",
             )
         except FileNotFoundError as exc:

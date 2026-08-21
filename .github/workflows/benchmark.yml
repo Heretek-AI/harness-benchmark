@@ -145,6 +145,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -153,6 +161,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Install harness (${{ matrix.harness }})
+        run: |
+          mkdir -p "${HOME}/.local/bin"
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+          bash scripts/install_harness.sh "${{ matrix.harness }}"
       - name: Run benchmark cell
         id: run
         shell: bash

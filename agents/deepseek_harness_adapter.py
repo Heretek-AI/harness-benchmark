@@ -33,11 +33,18 @@ class DeepSeekHarnessAdapter(BaseAgentAdapter):
 
     @staticmethod
     def resolve_cli() -> str | None:
-        return shutil.which("deepseek")
+        return shutil.which("deepseek") or shutil.which("dsh")
 
 
 class DeepSeekReasonixAdapter(DeepSeekHarnessAdapter):
     """Specialized adapter for DeepSeek-Reasonix harness variant."""
 
     name = "DeepSeek-Reasonix"
-    cli_binary = "deepseek"
+    cli_binary = "reasonix"
+
+    def _build_command(self, prompt: str, workspace_dir) -> list[str]:
+        return [self.cli_binary, "--task", prompt]
+
+    @staticmethod
+    def resolve_cli() -> str | None:
+        return shutil.which("reasonix") or shutil.which("deepseek")

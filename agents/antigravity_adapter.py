@@ -39,4 +39,4 @@ class AntigravityAdapter(BaseAgentAdapter):
 
     @staticmethod
     def resolve_cli() -> str | None:
-        return shutil.which("antigravity")
+        return shutil.which("antigravity") or shutil.which("agy")
