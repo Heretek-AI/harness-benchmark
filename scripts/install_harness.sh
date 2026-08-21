@@ -108,25 +108,40 @@ EOF
   fi
 
   if [ ! -f "${BIN_DIR}/deepseek" ]; then
-    echo "Creating fallback shim for deepseek..."
+    echo "Creating Agent Engine runner for deepseek / dsh..."
     cat << 'EOF' > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
+if [ -f "${REPO_ROOT}/scripts/agent_engine.py" ]; then
+  exec python3 "${REPO_ROOT}/scripts/agent_engine.py" "$@"
+fi
 echo "DeepSeek harness CLI wrapper"
 exit 0
 EOF
     chmod +x "${BIN_DIR}/deepseek"
+    ln -sf "${BIN_DIR}/deepseek" "${BIN_DIR}/dsh"
   fi
 }
 
 install_antigravity_cli() {
   echo "==> Setting up Antigravity CLI (antigravity / agy)..."
-  cat << 'EOF' > "${BIN_DIR}/antigravity"
+  if command -v agy >/dev/null 2>&1 && [ "$(command -v agy)" != "${BIN_DIR}/antigravity" ] && [ "$(command -v agy)" != "${BIN_DIR}/agy" ]; then
+    echo "Using existing agy binary on host: $(command -v agy)"
+    ln -sf "$(command -v agy)" "${BIN_DIR}/antigravity"
+  else
+    echo "Creating Agent Engine runner for antigravity / agy..."
+    cat << 'EOF' > "${BIN_DIR}/antigravity"
 #!/usr/bin/env bash
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
+if [ -f "${REPO_ROOT}/scripts/agent_engine.py" ]; then
+  exec python3 "${REPO_ROOT}/scripts/agent_engine.py" "$@"
+fi
 echo "Antigravity CLI wrapper"
 exit 0
 EOF
-  chmod +x "${BIN_DIR}/antigravity"
-  ln -sf "${BIN_DIR}/antigravity" "${BIN_DIR}/agy"
+    chmod +x "${BIN_DIR}/antigravity"
+    ln -sf "${BIN_DIR}/antigravity" "${BIN_DIR}/agy"
+  fi
 }
 
 case "${HARNESS}" in

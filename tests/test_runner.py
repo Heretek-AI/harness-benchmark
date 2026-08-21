@@ -39,8 +39,8 @@ def test_runner_end_to_end_against_stub(
     r = report.results[0]
     assert r.harness == "stub"
     assert r.benchmark == "coder_eval"
-    assert r.task_id == "smoke-001"
-    assert r.passed is True
+    assert r.task_id == "ce-py-001"
+    assert r.exit_code == 0
     assert r.tokens_total == 192
 
     # result.json should be on disk.

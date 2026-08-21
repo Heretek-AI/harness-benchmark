@@ -49,8 +49,15 @@ class AntigravityAdapter(BaseAgentAdapter):
         (config_dir / "config.json").write_text(json.dumps(config, indent=2))
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "run", prompt]
+        return [
+            self.cli_binary,
+            "-p",
+            prompt,
+            "--dangerously-skip-permissions",
+            "--output-format",
+            "json",
+        ]
 
     @staticmethod
     def resolve_cli() -> str | None:
-        return shutil.which("antigravity") or shutil.which("agy")
+        return shutil.which("agy") or shutil.which("antigravity")

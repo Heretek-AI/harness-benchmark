@@ -18,8 +18,10 @@ import pytest
 from agents import (
     AntigravityAdapter,
     DeepSeekHarnessAdapter,
+    DeepSeekReasonixAdapter,
     GeminiCLIAdapter,
     OpenCodeAdapter,
+    StubAdapter,
 )
 from benchmarks import CoderEvalAdapter, JSONManifestBenchmark, TaskSpec
 
@@ -29,17 +31,23 @@ from benchmarks import CoderEvalAdapter, JSONManifestBenchmark, TaskSpec
 
 def test_default_build_command_is_cli_plus_prompt() -> None:
     """Adapters that don't override _build_command get [cli_binary, prompt]."""
-    # Use AntigravityAdapter because its name+cli_binary are well-defined
-    # and it overrides _build_command — confirms the override path.
-    a = AntigravityAdapter()
+    a = StubAdapter()
     cmd = a._build_command("hello", Path("/tmp"))
-    assert cmd == ["antigravity", "run", "hello"]
+    assert cmd == ["/bin/echo", "hello"]
 
 
 def test_per_adapter_command_shapes() -> None:
     assert DeepSeekHarnessAdapter()._build_command("p", Path("/x")) == [
         "deepseek",
-        "--task",
+        "run",
+        "p",
+    ]
+    assert DeepSeekReasonixAdapter()._build_command("p", Path("/x")) == [
+        "reasonix",
+        "run",
+        "--auto",
+        "--output-format",
+        "json",
         "p",
     ]
     assert GeminiCLIAdapter()._build_command("p", Path("/x")) == [
@@ -54,7 +62,17 @@ def test_per_adapter_command_shapes() -> None:
         "opencode",
         "run",
         "--auto",
+        "--format",
+        "json",
         "p",
+    ]
+    assert AntigravityAdapter()._build_command("p", Path("/x")) == [
+        "antigravity",
+        "-p",
+        "p",
+        "--dangerously-skip-permissions",
+        "--output-format",
+        "json",
     ]
 
 
@@ -119,7 +137,7 @@ def test_coder_eval_synthetic_task_is_loadable(tmp_path: Path) -> None:
     """Sanity check that the real adapter's synthetic fallback still wires up."""
     bench = CoderEvalAdapter(dataset_path=tmp_path)  # manifest absent
     tasks = list(bench.iter_tasks(limit=1))
-    assert tasks[0].task_id == "smoke-001"
+    assert tasks[0].task_id == "ce-py-smoke-001"
     assert tasks[0].expected == {"stdout_contains": "5"}
 
 

@@ -1,0 +1,72 @@
+[
+  {
+    "task_id": "tb-sh-001",
+    "prompt": "Create a file named `marker.txt` in the current directory with content `antigravity_verified`.",
+    "expected": {
+      "verify_cmd": "test -f marker.txt && grep -q 'antigravity_verified' marker.txt"
+    }
+  },
+  {
+    "task_id": "tb-sh-002",
+    "prompt": "Create a nested directory structure `src/utils/helpers` and inside it create an empty file named `__init__.py`.",
+    "expected": {
+      "verify_cmd": "test -d src/utils/helpers && test -f src/utils/helpers/__init__.py"
+    }
+  },
+  {
+    "task_id": "tb-sh-003",
+    "prompt": "Write a bash script `count_lines.sh` that takes a filename as first argument and prints the number of lines in that file. Make it executable.",
+    "expected": {
+      "verify_cmd": "test -x count_lines.sh && printf 'line1\\nline2\\nline3\\n' > /tmp/tb_test.txt && test \"$(./count_lines.sh /tmp/tb_test.txt | tr -dc '0-9')\" = '3'"
+    }
+  },
+  {
+    "task_id": "tb-sh-004",
+    "prompt": "Create a JSON file named `config.json` containing `{\"version\": \"1.0.0\", \"enabled\": true}`.",
+    "expected": {
+      "verify_cmd": "python3 -c \"import json; d=json.load(open('config.json')); assert d['version']=='1.0.0' and d['enabled'] is True\""
+    }
+  },
+  {
+    "task_id": "tb-sh-005",
+    "prompt": "Initialize a git repository in the current directory, configure user.name to 'Benchmark Agent' and user.email to 'agent@bench.local', create a file `README.md` with '# Benchmark', and commit it with message 'Initial commit'.",
+    "expected": {
+      "verify_cmd": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git log -1 --pretty=%B | grep -q 'Initial commit'"
+    }
+  },
+  {
+    "task_id": "tb-sh-006",
+    "prompt": "Find all `.py` files in the current workspace and write their filenames sorted alphabetically into `python_files.txt`.",
+    "expected": {
+      "verify_cmd": "test -f python_files.txt"
+    }
+  },
+  {
+    "task_id": "tb-sh-007",
+    "prompt": "Create a CSV file named `users.csv` with header `id,name,role` and two rows: `1,alice,admin` and `2,bob,editor`.",
+    "expected": {
+      "verify_cmd": "python3 -c \"import csv; rows=list(csv.reader(open('users.csv'))); assert rows[0]==['id','name','role'] and rows[1]==['1','alice','admin'] and rows[2]==['2','bob','editor']\""
+    }
+  },
+  {
+    "task_id": "tb-sh-008",
+    "prompt": "Write a shell command or script that extracts the HTTP status code from the string 'HTTP/1.1 200 OK' and writes '200' to `status_code.txt`.",
+    "expected": {
+      "verify_cmd": "test -f status_code.txt && test \"$(cat status_code.txt | tr -d '[:space:]')\" = '200'"
+    }
+  },
+  {
+    "task_id": "tb-sh-009",
+    "prompt": "Create an archive `data.tar.gz` containing a directory `backup` with a file `backup/log.txt` containing 'system_active'.",
+    "expected": {
+      "verify_cmd": "tar -ztvf data.tar.gz | grep -q 'backup/log.txt'"
+    }
+  },
+  {
+    "task_id": "tb-sh-010",
+    "prompt": "Write an environment configuration file `.env` with `API_PORT=8080` and `DEBUG_MODE=true`.",
+    "expected": {
+      "verify_cmd": "grep -q 'API_PORT=8080' .env && grep -q 'DEBUG_MODE=true' .env"
+    }
+  }
+]

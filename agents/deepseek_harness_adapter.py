@@ -49,7 +49,7 @@ class DeepSeekHarnessAdapter(BaseAgentAdapter):
         (deepseek_dir / "config.json").write_text(json.dumps(config, indent=2))
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "--task", prompt]
+        return [self.cli_binary, "run", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:
@@ -102,7 +102,7 @@ api_key_env = "REASONIX_API_KEY"
         (ctx.workspace_dir / "reasonix.toml").write_text(toml_content)
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "--task", prompt]
+        return [self.cli_binary, "run", "--auto", "--output-format", "json", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:

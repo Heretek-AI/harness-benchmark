@@ -61,7 +61,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         ctx.extra_env["OPENCODE_CONFIG"] = str(cfg_path)
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "run", "--auto", prompt]
+        return [self.cli_binary, "run", "--auto", "--format", "json", prompt]
 
     @staticmethod
     def resolve_cli() -> str | None:
