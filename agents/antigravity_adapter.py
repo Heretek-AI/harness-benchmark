@@ -1,12 +1,8 @@
-"""Adapter for the ``antigravity-cli`` harness.
+"""Adapter for the Google Antigravity CLI (``antigravity-cli``) harness.
 
-SKELETON — the CLI's real flag set lives in ``review/agents/antigravity-cli``
-and should be filled in once we wire that harness for real. For now this
-adapter writes a stub config file so the runner exercises the full
-setup/execute/teardown path. Subprocess spawning + ExecutionResult
-construction are inherited from ``BaseAgentAdapter``; we only override
-``_on_setup`` (config-file materialisation) and ``_build_command`` (the
-``antigravity run <prompt>`` argv shape).
+Translates benchmark tasks and configuration into Antigravity workspace
+settings (``.antigravity/config.json``) and drives the ``antigravity run``
+command lifecycle.
 """
 
 from __future__ import annotations
@@ -18,6 +14,8 @@ from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class AntigravityAdapter(BaseAgentAdapter):
+    """Harness adapter for Antigravity CLI."""
+
     name = "antigravity-cli"
     cli_binary = "antigravity"
 

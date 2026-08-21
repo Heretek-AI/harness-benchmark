@@ -59,6 +59,8 @@ class AdapterContext:
     workspace_dir: Path
     plugin_dir: Path | None = None  # synthesized plugin root, if any
     mcp_config_path: Path | None = None  # synthesized mcp-config file, if any
+    plugins: list[str] = field(default_factory=list)
+    mcp_servers: list[str] = field(default_factory=list)
     extra_env: dict[str, str] = field(default_factory=dict)
     child_pids: list[int] = field(default_factory=list)
 
@@ -99,7 +101,11 @@ class BaseAgentAdapter(abc.ABC):
         workspace = self._tmp_root / "workspace"
         workspace.mkdir(parents=True, exist_ok=True)
 
-        self._ctx = AdapterContext(workspace_dir=workspace)
+        self._ctx = AdapterContext(
+            workspace_dir=workspace,
+            plugins=list(plugins),
+            mcp_servers=list(mcp_servers),
+        )
         self._ctx.extra_env.update(env_vars)
 
         try:
@@ -191,6 +197,8 @@ class BaseAgentAdapter(abc.ABC):
         rather than crashing the whole sweep.
         """
         start = time.monotonic()
+        plugins = list(self.ctx.plugins) if self._ctx else []
+        mcp_servers = list(self.ctx.mcp_servers) if self._ctx else []
         try:
             proc = subprocess.run(
                 cmd,
@@ -205,20 +213,34 @@ class BaseAgentAdapter(abc.ABC):
                 harness=self.name,
                 benchmark="",
                 task_id="",
+                plugins=plugins,
+                mcp_servers=mcp_servers,
                 exit_code=-1,
                 duration_seconds=time.monotonic() - start,
                 stdout="",
                 stderr=str(exc),
                 error=type(exc).__name__,
             )
+        tokens_in, tokens_out = self.extract_token_usage(proc.stdout)
+        tool_calls = self.count_tool_calls(proc.stdout)
         return ExecutionResult(
             harness=self.name,
             benchmark="",
             task_id="",
+            plugins=plugins,
+            mcp_servers=mcp_servers,
             exit_code=proc.returncode,
             duration_seconds=time.monotonic() - start,
             stdout=proc.stdout,
             stderr=proc.stderr,
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+            tokens_total=(
+                (tokens_in or 0) + (tokens_out or 0)
+                if tokens_in is not None and tokens_out is not None
+                else None
+            ),
+            tool_calls=tool_calls,
         )
 
     # ---- helpers for subclasses ----

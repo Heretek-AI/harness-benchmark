@@ -11,7 +11,7 @@ from agents.base import BaseAgentAdapter, ExecutionResult
 # Real adapters (filled in below).
 from agents.claude_code_adapter import ClaudeCodeAdapter
 from agents.antigravity_adapter import AntigravityAdapter
-from agents.deepseek_harness_adapter import DeepSeekHarnessAdapter
+from agents.deepseek_harness_adapter import DeepSeekHarnessAdapter, DeepSeekReasonixAdapter
 from agents.gemini_cli_adapter import GeminiCLIAdapter
 from agents.opencode_adapter import OpenCodeAdapter
 from agents.stub_adapter import StubAdapter
@@ -20,7 +20,7 @@ ADAPTERS: dict[str, type[BaseAgentAdapter]] = {
     "claude-code": ClaudeCodeAdapter,
     "antigravity-cli": AntigravityAdapter,
     "deepseek-harness": DeepSeekHarnessAdapter,
-    "DeepSeek-Reasonix": DeepSeekHarnessAdapter,  # alias
+    "DeepSeek-Reasonix": DeepSeekReasonixAdapter,
     "gemini-cli": GeminiCLIAdapter,
     "opencode": OpenCodeAdapter,
     "stub": StubAdapter,  # for smoke tests; not part of the real matrix
@@ -48,6 +48,7 @@ __all__ = [
     "BaseAgentAdapter",
     "ClaudeCodeAdapter",
     "DeepSeekHarnessAdapter",
+    "DeepSeekReasonixAdapter",
     "ExecutionResult",
     "GeminiCLIAdapter",
     "OpenCodeAdapter",

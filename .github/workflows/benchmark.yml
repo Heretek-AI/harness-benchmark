@@ -111,8 +111,8 @@ jobs:
 
           matrix = {
               "harness": [harness_in] if harness_in != "all" else [
-                  "claude-code", "gemini-cli", "opencode",
-                  "deepseek-harness", "antigravity-cli",
+                  "antigravity-cli", "claude-code", "deepseek-harness",
+                  "DeepSeek-Reasonix", "gemini-cli", "opencode",
               ],
               "benchmark": [benchmark_in] if benchmark_in != "all" else [
                   "coder_eval", "terminal-bench",
@@ -191,8 +191,6 @@ jobs:
           pattern: bench-*
           merge-multiple: true
       - name: Aggregate and write step summary
-        env:
-          GITHUB_STEP_SUMMARY: ${{ github.summary }}
         shell: python
         run: |
           import json, os
@@ -220,7 +218,7 @@ jobs:
                       f"| {cell['harness']} | {cell['benchmark']} | "
                       f"{','.join(cell['plugins']) or 'none'} | "
                       f"{','.join(cell['mcp_servers']) or 'none'} | "
-                      f"{(s.get('pass_rate') or 0)*100:.1f}% | "
+                      f"{(s.get('pass_rate') if s.get('pass_rate') is not None else 0)*100:.1f}% | "
                       f"{(s.get('latency_p50') or 0)*1000:.0f} ms | "
                       f"{(s.get('latency_p95') or 0)*1000:.0f} ms | "
                       f"{s.get('tokens_input_total', 0):,}/{s.get('tokens_output_total', 0):,} | "
@@ -229,9 +227,11 @@ jobs:
                   )
 
           summary = "\n".join(md) + "\n"
-          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
-          with open(summary_path, "a") as f:
-              f.write(summary)
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a") as f:
+                  f.write(summary)
+          os.makedirs("runs", exist_ok=True)
           (Path("runs") / "REPORT.md").write_text(summary)
       - name: Upload aggregated report
         uses: actions/upload-artifact@v4

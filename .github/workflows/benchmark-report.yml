@@ -7,20 +7,52 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   publish-pr-comment:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.event == 'pull_request'
+    if: github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.pull_requests != '[]'
     steps:
-      - name: Download benchmark artifacts
+      - name: Download report artifact and comment
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // We can't easily pull artifacts cross-workflow without
-            // actions/download-artifact@4 on a workflow_run trigger
-            // because the source run's artifacts are still accessible
-            // for 90 days. Skip the heavy lifting here and rely on the
-            // benchmark.yml report job to upload a single summary
-            // artifact that downstream consumers can fetch.
-            core.info('benchmark-report: deferring to the main workflow summary')
+            const prs = context.payload.workflow_run.pull_requests;
+            if (!prs || prs.length === 0) {
+              core.info('No associated pull request found for this workflow run.');
+              return;
+            }
+            const prNumber = prs[0].number;
+            const runId = context.payload.workflow_run.id;
+
+            // List artifacts from the completed workflow run
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+
+            const reportArtifact = artifacts.data.artifacts.find(
+              (art) => art.name === 'bench-report'
+            );
+
+            if (!reportArtifact) {
+              core.info('No bench-report artifact found for run ' + runId);
+              return;
+            }
+
+            core.info(`Found bench-report artifact (id: ${reportArtifact.id}) for PR #${prNumber}`);
+            
+            const commentBody = `### 🤖 Benchmark Run Completed (Run #${runId})\n\n` +
+              `Benchmark results have been published to the [Workflow Run Summary](${context.payload.workflow_run.html_url}).\n\n` +
+              `Artifacts retention: 90 days. Check the step summary for full per-harness metrics.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: commentBody,
+            });

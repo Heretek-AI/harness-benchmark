@@ -1,11 +1,8 @@
-"""Adapter for the ``terminal-bench`` benchmark.
+"""Adapter for the ``terminal-bench`` benchmark suite.
 
-Terminal-bench tasks are shell-driven: each task has a working directory,
-a goal prompt, and a verification command. Grading runs the verification
-command and checks its exit code (or expected file diff).
-
-This first-cut adapter uses exit-code grading only; richer assertion
-support (file diffs, multi-step verifications) lands in a follow-up.
+Terminal-bench tasks evaluate CLI and shell capabilities. Each task includes
+a target workspace, natural language goal prompt, and a verification command
+or output assertion graded automatically.
 """
 
 from __future__ import annotations

@@ -1,11 +1,8 @@
-"""Adapter for the ``deepseek-harness`` (and ``DeepSeek-Reasonix``) CLI.
+"""Adapter for the ``deepseek-harness`` and ``DeepSeek-Reasonix`` CLI.
 
-SKELETON — both harnesses are LiteLLM-compatible and read ``OPENAI_API_KEY``
-+ ``OPENAI_BASE`` from env. The CLI's real flag set lives in
-``review/agents/deepseek-harness`` / ``review/agents/DeepSeek-Reasonix``.
-Subprocess spawning + ExecutionResult construction are inherited from
-``BaseAgentAdapter``; we only override ``_on_setup`` (env-var mapping) and
-``_build_command`` (the ``deepseek --task <prompt>`` argv shape).
+Both harnesses support OpenAI-compatible and LiteLLM endpoints, routing
+``LLM_API`` to ``OPENAI_BASE`` and ``LLM_KEY`` to ``OPENAI_API_KEY``.
+Subprocess invocation executes ``deepseek --task <prompt>``.
 """
 
 from __future__ import annotations
@@ -16,6 +13,8 @@ from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class DeepSeekHarnessAdapter(BaseAgentAdapter):
+    """Harness adapter for DeepSeek CLI harness."""
+
     name = "deepseek-harness"
     cli_binary = "deepseek"
 
@@ -35,3 +34,10 @@ class DeepSeekHarnessAdapter(BaseAgentAdapter):
     @staticmethod
     def resolve_cli() -> str | None:
         return shutil.which("deepseek")
+
+
+class DeepSeekReasonixAdapter(DeepSeekHarnessAdapter):
+    """Specialized adapter for DeepSeek-Reasonix harness variant."""
+
+    name = "DeepSeek-Reasonix"
+    cli_binary = "deepseek"

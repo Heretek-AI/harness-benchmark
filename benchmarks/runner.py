@@ -113,8 +113,8 @@ class BenchmarkRunner:
 
         cells = list(
             itertools.product(
-                self.config.harness,
-                self.config.benchmark,
+                self._harness_cells(),
+                self._benchmark_cells(),
                 self._plugin_cells(),
                 self._mcp_cells(),
             )
@@ -207,6 +207,8 @@ class BenchmarkRunner:
                 result.plugins = list(plugins)
                 result.mcp_servers = list(mcp_servers)
                 result.passed = benchmark.grade(result, task.expected)
+                if (result.tokens_input is not None or result.tokens_output is not None) and result.tokens_total is None:
+                    result.tokens_total = (result.tokens_input or 0) + (result.tokens_output or 0)
                 if result.tokens_total is not None and result.cost_usd is None:
                     result.cost_usd = BaseAgentAdapter.estimate_cost(
                         os.environ.get("LLM_MODEL", ""),
@@ -225,6 +227,18 @@ class BenchmarkRunner:
             finally:
                 self.mcp_launcher.terminate(mcp_handles)
         return results
+
+    def _harness_cells(self) -> list[str]:
+        cleaned = [h for h in self.config.harness if h]
+        if "all" in cleaned:
+            return [name for name in ADAPTERS if name != "stub"]
+        return cleaned
+
+    def _benchmark_cells(self) -> list[str]:
+        cleaned = [b for b in self.config.benchmark if b]
+        if "all" in cleaned:
+            return list(BENCHMARKS.keys())
+        return cleaned
 
     def _plugin_cells(self) -> list[list[str]]:
         cleaned = [p for p in self.config.plugins if p]

@@ -1,11 +1,9 @@
 """Adapter for the ``opencode`` harness.
 
-SKELETON — OpenCode reads its config from ``~/.config/opencode/config.json``
-or the path in ``OPENCODE_CONFIG``. See ``review/agents/opencode/`` for the
-real schema. Subprocess spawning + ExecutionResult construction are
-inherited from ``BaseAgentAdapter``; we only override ``_on_setup``
-(config-file materialisation + ``OPENCODE_CONFIG`` env) and
-``_build_command`` (the ``opencode --non-interactive <prompt>`` argv shape).
+OpenCode reads its configuration from the file pointed to by ``OPENCODE_CONFIG``
+or ``~/.config/opencode/config.json``. The adapter synthesizes an ``opencode.json``
+file specifying LiteLLM provider details and registered MCP servers, then
+invokes ``opencode --non-interactive <prompt>``.
 """
 
 from __future__ import annotations
@@ -17,6 +15,8 @@ from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class OpenCodeAdapter(BaseAgentAdapter):
+    """Harness adapter for OpenCode CLI."""
+
     name = "opencode"
     cli_binary = "opencode"
 

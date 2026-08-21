@@ -74,35 +74,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, help="Preset YAML to load")
     parser.add_argument(
         "--harness",
-        default="all",
+        default=None,
         help="Comma-separated harness names, 'all', or 'none' (run without harness).",
     )
     parser.add_argument(
         "--benchmark",
-        default="all",
+        default=None,
         help="Comma-separated benchmark names, 'all', or 'none'.",
     )
     parser.add_argument(
         "--plugins",
-        default="none",
+        default=None,
         help="Comma-separated plugin names, 'all', or 'none'.",
     )
     parser.add_argument(
         "--mcp",
         dest="mcp_servers",
-        default="none",
+        default=None,
         help="Comma-separated MCP server names, 'all', or 'none'.",
     )
-    parser.add_argument("--tasks-limit", type=int, default=0)
-    parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--tasks-limit", type=int, default=None)
+    parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument(
         "--output-format",
         choices=["json", "markdown", "github-summary"],
-        default="json",
+        default=None,
     )
     parser.add_argument("--output-dir", type=Path, default=Path("runs"))
     parser.add_argument(
-        "--name", default="ad-hoc", help="Run name; becomes the run-id prefix."
+        "--name", default=None, help="Run name; becomes the run-id prefix."
     )
     parser.add_argument(
         "--plugin-registry", type=Path, help="Override plugins/registry.json path"
@@ -122,23 +122,54 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    # Preset YAML wins for anything it sets; CLI flags override.
+    # Preset YAML provides defaults; explicit CLI flags override.
     preset = _load_preset(args.config) if args.config else {}
+    matrix = preset.get("matrix", {}) if isinstance(preset.get("matrix"), dict) else {}
 
-    harness = _split_csv(str(args.harness))
-    benchmark = _split_csv(str(args.benchmark))
-    plugins = _split_csv(str(args.plugins))
-    mcp = _split_csv(str(args.mcp_servers))
+    def _resolve_list(cli_val: str | None, preset_val: Any, default_str: str) -> list[str]:
+        if cli_val is not None:
+            return _split_csv(cli_val)
+        if preset_val is not None:
+            if isinstance(preset_val, list):
+                return [str(x) for x in preset_val]
+            return _split_csv(str(preset_val))
+        return _split_csv(default_str)
+
+    harness = _resolve_list(args.harness, matrix.get("harness"), "all")
+    benchmark = _resolve_list(args.benchmark, matrix.get("benchmark"), "all")
+    plugins = _resolve_list(args.plugins, matrix.get("plugins"), "none")
+    mcp = _resolve_list(args.mcp_servers, matrix.get("mcp_servers"), "none")
+
+    tasks_limit = (
+        args.tasks_limit
+        if args.tasks_limit is not None
+        else int(preset.get("tasks_limit", 0) or 0)
+    )
+    timeout_seconds = (
+        args.timeout
+        if args.timeout is not None
+        else int(preset.get("timeout_seconds", 600) or 600)
+    )
+    output_format = (
+        args.output_format
+        if args.output_format is not None
+        else str(preset.get("output_format", "json"))
+    )
+    name = (
+        args.name
+        if args.name is not None
+        else str(preset.get("name") or "ad-hoc")
+    )
 
     config = RunConfig(
-        name=args.name,
+        name=name,
         harness=harness,
         benchmark=benchmark,
         plugins=plugins,
         mcp_servers=mcp,
-        tasks_limit=args.tasks_limit or int(preset.get("tasks_limit", 0) or 0),
-        timeout_seconds=args.timeout or int(preset.get("timeout_seconds", 600)),
-        output_format=args.output_format,
+        tasks_limit=tasks_limit,
+        timeout_seconds=timeout_seconds,
+        output_format=output_format,
         output_dir=args.output_dir,
     )
 
@@ -151,11 +182,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # Also print to stdout for ad-hoc local debugging; the per-run files
     # are the durable artefacts.
-    if args.output_format == "json":
+    if output_format == "json":
         print(render_json(report))
-    elif args.output_format == "markdown":
+    elif output_format == "markdown":
         print(render_markdown(report))
-    elif args.output_format == "github-summary":
+    elif output_format == "github-summary":
         print(render_github_summary(report))
 
     return 0

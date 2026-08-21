@@ -5,14 +5,48 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "harness-benchmark"
 version = "0.1.0"
-description = "Matrixed benchmark suite for AI coding harnesses, plugins, and MCP servers."
+description = "Automated matrix benchmark suite for AI coding harnesses (Claude Code, Antigravity, Gemini CLI, OpenCode, DeepSeek), Model Context Protocol (MCP) servers, and agent plugins."
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = [
+    "ai-agents",
+    "coding-agents",
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "antigravity",
+    "gemini-cli",
+    "deepseek",
+    "opencode",
+    "benchmark",
+    "coder-eval",
+    "terminal-bench",
+    "llm-eval",
+    "litellm",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "pydantic>=2.6,<3",
     "PyYAML>=6.0",
     "jsonschema>=4.21",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Heretek-AI/harness-benchmark"
+Repository = "https://github.com/Heretek-AI/harness-benchmark"
+Issues = "https://github.com/Heretek-AI/harness-benchmark/issues"
+Documentation = "https://github.com/Heretek-AI/harness-benchmark#readme"
 
 [project.optional-dependencies]
 dev = [

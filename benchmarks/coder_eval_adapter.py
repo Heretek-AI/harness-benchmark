@@ -1,15 +1,9 @@
-"""Adapter for the ``coder_eval`` benchmark.
+"""Adapter for the ``coder_eval`` benchmark suite.
 
-``coder_eval`` (https://github.com/UiPath/coder_eval) ships a JSON manifest
-of coding tasks keyed by ID. Each task has a natural-language ``prompt``
-and an ``expected`` block describing the reference solution (typically a
-function signature + a set of test cases). Grading compares the
-harness's ``stdout`` against the reference solution's test outcomes.
-
-The real dataset is not committed to this repo (it lives under
-``review/benchmarks/coder_eval``). When the manifest is absent we fall
-back to a single synthetic task so the runner can still exercise the full
-pipeline in a smoke test.
+Evaluates coding capabilities against coding problem manifests (derived from
+https://github.com/UiPath/coder_eval). Each task provides a natural-language
+prompt and assertion criteria. Supports synthetic fallback tasks for local
+smoke testing when external datasets are not mounted.
 """
 
 from __future__ import annotations

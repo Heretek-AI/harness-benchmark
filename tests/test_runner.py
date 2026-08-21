@@ -50,3 +50,62 @@ def test_runner_end_to_end_against_stub(
     assert result_path.exists()
     blob = json.loads(result_path.read_text())
     assert blob["run_id"] == report.run_id
+
+
+def test_runner_markdown_output_format(
+    tmp_path: Path,
+    plugin_registry_path: Path,
+    mcp_registry_path: Path,
+) -> None:
+    config = RunConfig(
+        name="unit-markdown",
+        harness=["stub"],
+        benchmark=["coder_eval", "terminal-bench"],
+        plugins=["none"],
+        mcp_servers=["none"],
+        tasks_limit=1,
+        timeout_seconds=30,
+        output_format="markdown",
+        output_dir=tmp_path / "runs",
+    )
+    runner = BenchmarkRunner(
+        config,
+        PluginLoader(plugin_registry_path),
+        MCPLauncher(mcp_registry_path),
+    )
+    report = runner.run()
+    assert len(report.results) == 2
+    run_dir = tmp_path / "runs" / report.run_id
+    report_md = run_dir / "REPORT.md"
+    assert report_md.exists()
+    content = report_md.read_text()
+    assert "# Benchmark run:" in content
+    assert "coder_eval" in content
+    assert "terminal-bench" in content
+
+
+def test_cli_main_invocation(tmp_path: Path) -> None:
+    from run_benchmark import main
+
+    rc = main(
+        [
+            "--harness",
+            "stub",
+            "--benchmark",
+            "coder_eval",
+            "--plugins",
+            "none",
+            "--mcp",
+            "none",
+            "--tasks-limit",
+            "1",
+            "--output-format",
+            "json",
+            "--output-dir",
+            str(tmp_path / "cli_runs"),
+        ]
+    )
+    assert rc == 0
+    run_dirs = list((tmp_path / "cli_runs").iterdir())
+    assert len(run_dirs) == 1
+    assert (run_dirs[0] / "result.json").exists()

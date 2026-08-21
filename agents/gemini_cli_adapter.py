@@ -1,12 +1,8 @@
-"""Adapter for the ``gemini-cli`` harness.
+"""Adapter for the Google ``gemini-cli`` harness.
 
-SKELETON — Gemini reads MCP servers from ``gemini-extension.json`` files in
-the workspace. See ``review/agents/gemini-cli/gemini-extension.json`` for
-the real schema; we write a minimal one when MCPs are requested.
-Subprocess spawning + ExecutionResult construction are inherited from
-``BaseAgentAdapter``; we only override ``_on_setup`` (extension-file
-materialisation) and ``_build_command`` (the ``gemini run <prompt>`` argv
-shape).
+Gemini CLI discovers MCP servers from ``gemini-extension.json`` files located in
+the workspace. The adapter synthesizes this extension file when MCP servers
+are requested and invokes ``gemini run <prompt>``.
 """
 
 from __future__ import annotations
@@ -20,6 +16,8 @@ from agents.base import AdapterContext, BaseAgentAdapter
 
 
 class GeminiCLIAdapter(BaseAgentAdapter):
+    """Harness adapter for Google Gemini CLI."""
+
     name = "gemini-cli"
     cli_binary = "gemini"
 

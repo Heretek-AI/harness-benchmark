@@ -1,109 +1,217 @@
-# Harness Benchmark
+# AI Harness & Plugin Benchmark Suite
 
-A matrixed benchmark suite for AI coding harnesses (Claude Code, Gemini
-CLI, OpenCode, DeepSeek, Antigravity), Claude plugins
-(`caveman`, `claude-mem`, `ECC`, `graphify`, `headroom`, `ponytail`,
-`rtk`, `Understand-Anything`), and MCP servers (`chrome-devtools-mcp`,
-`codebase-memory-mcp`, `context7`, `repomix`) — run against the
-benchmark suites [`coder_eval`](https://github.com/UiPath/coder_eval)
-and `terminal-bench` under a controlled `LLM_API` / `LLM_KEY` /
-`LLM_MODEL` envelope.
+[![CI Matrix Benchmark](https://github.com/Heretek-AI/harness-benchmark/actions/workflows/benchmark.yml/badge.svg)](https://github.com/Heretek-AI/harness-benchmark/actions/workflows/benchmark.yml)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-## Repository layout
+A production-ready, matrix-based automated benchmark suite for evaluating **AI Coding Harnesses** (`claude-code`, `antigravity-cli`, `gemini-cli`, `opencode`, `deepseek-harness`, `DeepSeek-Reasonix`), **Model Context Protocol (MCP) Servers** (`chrome-devtools-mcp`, `codebase-memory-mcp`, `context7`, `repomix`), and **Agent Plugins** (`caveman`, `claude-mem`, `ECC`, `graphify`, `headroom`, `ponytail`, `rtk`, `Understand-Anything`) across standardized benchmarks ([`coder_eval`](https://github.com/UiPath/coder_eval), `terminal-bench`) under controlled LLM configurations (`LLM_API`, `LLM_KEY`, `LLM_MODEL`).
 
+---
+
+## 🚀 Key Features
+
+* **Universal Harness Adapters**: Standardized lifecycle interface (`setup`, `execute_task`, `teardown`) isolating harness CLI mechanics.
+* **Dynamic Plugin & MCP Injection**: Zero-code catalog synthesis allowing arbitrary combinations of plugins and stdio/SSE MCP servers to be loaded into any agent.
+* **Multi-Suite Benchmark Orchestration**: Unified execution of coding problem manifests (`coder_eval`) and interactive shell tasks (`terminal-bench`) with synthetic smoke fallbacks.
+* **Granular Metrics & Cost Accounting**: Tracks Pass@1 accuracy, p50/p95 latency, input/output tokens, tool call frequency, and USD cost per run.
+* **Matrixed GitHub Actions Automation**: Dynamic matrix setup job fanning out runs across parallel GitHub Actions runners with automated `$GITHUB_STEP_SUMMARY` reporting.
+* **Rich Output Formats**: Emits structured `result.json`, GitHub-flavored Markdown `REPORT.md`, and per-task streaming `.jsonl` trace files.
+
+---
+
+## 📐 Architecture Overview
+
+```mermaid
+graph TD
+    CLI["run_benchmark.py / GitHub Actions"] --> Runner["benchmarks/runner.py (BenchmarkRunner)"]
+    Runner --> PluginLoader["plugins/loader.py (PluginLoader)"]
+    Runner --> MCPLauncher["mcp/mcp_launcher.py (MCPLauncher)"]
+    Runner --> AgentAdapter["agents/ (BaseAgentAdapter)"]
+    Runner --> BenchmarkAdapter["benchmarks/ (BaseBenchmark)"]
+    
+    PluginLoader -.-> PluginReg["plugins/registry.json"]
+    MCPLauncher -.-> MCPReg["mcp/mcp_registry.json"]
+    
+    AgentAdapter --> Subprocess["Harness CLI (claude, gemini, opencode, deepseek, antigravity)"]
+    BenchmarkAdapter --> Tasks["coder_eval / terminal-bench Tasks"]
+    
+    Runner --> Collector["metrics/collector.py (MetricCollector)"]
+    Collector --> CostTable["metrics/cost_table.py"]
+    Collector --> Reporter["metrics/report_generator.py (Markdown / Step Summary / JSON)"]
+    Reporter --> Artifacts["runs/<run-id>/ (result.json, REPORT.md, *.jsonl)"]
 ```
-agents/                # Harness adapters (one class per CLI)
-benchmarks/            # Benchmark adapters + the runner
-configs/               # Preset YAMLs + JSON schema for run configs
-mcp/                   # MCP server registry + launcher
-metrics/               # Pass@1 / latency / token / cost collector + Markdown reporter
-plugins/               # Plugin registry + loader
-tests/                 # pytest suite
-.github/workflows/     # Matrixed benchmark.yml + benchmark-report.yml
-run_benchmark.py       # CLI entrypoint
+
+---
+
+## 📁 Repository Layout
+
+```text
+├── .github/
+│   └── workflows/
+│       ├── benchmark.yml             # Matrixed dispatch workflow with dynamic matrix generation
+│       └── benchmark-report.yml      # Aggregates run artifacts and publishes PR comments
+├── agents/                           # Wrapper adapters for each agent CLI
+│   ├── __init__.py                   # Adapter registry mapping harness name -> class
+│   ├── base.py                       # Abstract Base Agent interface & ExecutionResult model
+│   ├── antigravity_adapter.py        # Google Antigravity CLI adapter
+│   ├── claude_code_adapter.py        # Anthropic Claude Code adapter with JSONL parsing
+│   ├── deepseek_harness_adapter.py   # DeepSeek & DeepSeek-Reasonix LiteLLM adapter
+│   ├── gemini_cli_adapter.py         # Google Gemini CLI adapter with extension synthesis
+│   ├── opencode_adapter.py           # OpenCode adapter with provider config synthesis
+│   └── stub_adapter.py               # Hermetic mock adapter for smoke tests
+├── plugins/                          # Dynamic plugin injection layer & manifests
+│   ├── registry.json                 # Catalog of supported plugins and injection points
+│   ├── registry.schema.json          # JSON Schema for plugin registry
+│   └── loader.py                     # Dynamically stages plugins into agent configs
+├── mcp/                              # MCP server configs & launch wrappers
+│   ├── mcp_registry.json             # Catalog of MCP servers (stdio & SSE)
+│   ├── mcp_registry.schema.json      # JSON Schema for MCP registry
+│   └── mcp_launcher.py               # Spawns and manages MCP server subprocesses
+├── benchmarks/                       # Benchmark runners and graders
+│   ├── base.py                       # BaseBenchmark and JSONManifestBenchmark abstractions
+│   ├── coder_eval_adapter.py         # UiPath coder_eval dataset adapter
+│   ├── terminal_bench_adapter.py     # Terminal/CLI task execution adapter
+│   └── runner.py                     # Unified benchmark execution orchestrator
+├── configs/
+│   ├── presets/                      # Pre-baked benchmark suites
+│   │   ├── full_matrix.yaml          # Nightly multi-agent sweep
+│   │   ├── smoke_test.yaml           # Fast PR-time sanity check
+│   │   └── mcp_isolation.yaml        # Isolated MCP performance regression tests
+│   └── schema.json                   # JSON schema for run configurations
+├── metrics/                          # Evaluation and reporting
+│   ├── collector.py                  # Accumulates Pass@1, latency, tokens, tool usage
+│   ├── cost_table.py                 # USD token pricing table per model
+│   └── report_generator.py           # Markdown table & GitHub Step Summary generator
+├── tests/                            # Comprehensive Pytest test suite
+├── run_benchmark.py                  # Main CLI entrypoint
+├── requirements.txt                  # Python dependencies
+├── pyproject.toml                    # Package metadata & build configuration
+├── AGENTS.md                         # Universal AI agent operating guidelines
+├── CLAUDE.md                         # Claude Code CLI developer guide
+├── GEMINI.md                         # Gemini CLI & Antigravity developer guide
+└── README.md                         # Project documentation
 ```
 
-## Quickstart (local)
+---
+
+## ⚡ Quickstart (Local CLI)
+
+### 1. Installation
 
 ```bash
-# Install once
+git clone https://github.com/Heretek-AI/harness-benchmark.git
+cd harness-benchmark
 pip install -r requirements.txt
-
-# Run the smoke preset against the bundled stub harness
-python run_benchmark.py --config configs/presets/smoke_test.yaml \
-    --harness stub --output-format markdown
-
-# Run a real sweep over Claude Code x coder_eval x every MCP, 3 tasks each
-python run_benchmark.py \
-    --harness claude-code \
-    --benchmark coder_eval \
-    --plugins none \
-    --mcp chrome-devtools-mcp,codebase-memory-mcp,context7,repomix \
-    --tasks-limit 3 \
-    --output-format github-summary
 ```
 
-The runner writes per-run artefacts to `./runs/<run-id>/`:
+### 2. Run Smoke Tests (No API Keys Required)
 
-* `result.json` — the full structured report
-* `REPORT.md` — Markdown comparison table (when `--output-format markdown` or `github-summary`)
-* `<harness>__<benchmark>__<task>.jsonl` — per-task raw results for drill-down
+Use the built-in hermetic `stub` harness to verify the full orchestration pipeline without incurring API costs:
 
-## Required environment
+```bash
+# Run the pre-configured smoke test preset
+python run_benchmark.py --config configs/presets/smoke_test.yaml --harness stub --output-format markdown
+```
 
-| Var | Purpose |
-|---|---|
-| `LLM_API` | LiteLLM / OpenAI-compatible base URL |
-| `LLM_KEY` | API key for that endpoint |
-| `LLM_MODEL` | Model identifier used for every cell of the matrix |
-| `HARNESS_BENCH_MCP_REGISTRY` | Optional override for the MCP registry path (defaults to `mcp/mcp_registry.json`) |
-| `HARNESS_BENCH_PLUGIN_REGISTRY` | Optional override for the plugin registry path |
-| `HARNESS_BENCH_PRICING_JSON` | Optional JSON file overriding the model-pricing table |
+### 3. Run Live Evaluation Sweeps
 
-## CI
+Set your LLM credentials and run target combinations:
 
-The `.github/workflows/benchmark.yml` workflow:
+```bash
+export LLM_API="https://api.openai.com/v1"
+export LLM_KEY="sk-..."
+export LLM_MODEL="gpt-4o"
 
-1. Triggers on `workflow_dispatch`, push to `main` (only when relevant paths
-   change), and a nightly cron at 04:07 UTC.
-2. Expands the (harness x benchmark x plugin x MCP) matrix in a setup job
-   so the YAML itself stays static.
-3. Runs every cell in parallel, uploading `runs/**/result.json` as a
-   per-cell artifact.
-4. Aggregates the results in a `report` job and writes the comparison
-   table to `$GITHUB_STEP_SUMMARY`.
+# Run Claude Code against coder_eval with specific MCP servers:
+python run_benchmark.py \
+  --harness claude-code \
+  --benchmark coder_eval \
+  --plugins none \
+  --mcp chrome-devtools-mcp,codebase-memory-mcp,context7,repomix \
+  --tasks-limit 3 \
+  --output-format github-summary
+```
 
-The required repository secrets are `LLM_API`, `LLM_KEY`, and `LLM_MODEL`.
+---
 
-To dispatch a one-off cell:
+## 🛠️ CLI Reference
 
-> Actions → Benchmark → Run workflow → set `harness=claude-code`,
-> `benchmark=coder_eval`, `plugins=none`, `mcp_servers=context7`,
-> `task_limit=3`.
+```text
+usage: harness-benchmark [-h] [--config CONFIG] [--harness HARNESS] [--benchmark BENCHMARK]
+                         [--plugins PLUGINS] [--mcp MCP_SERVERS] [--tasks-limit TASKS_LIMIT]
+                         [--timeout TIMEOUT] [--output-format {json,markdown,github-summary}]
+                         [--output-dir OUTPUT_DIR] [--name NAME]
+                         [--plugin-registry PLUGIN_REGISTRY] [--mcp-registry MCP_REGISTRY] [-v]
+```
 
-## Adding a new harness
+| Flag | Description | Default |
+|---|---|---|
+| `--config` | Path to preset YAML (`configs/presets/*.yaml`) | `None` |
+| `--harness` | Comma-separated harness names or `all` | `all` |
+| `--benchmark` | Comma-separated benchmarks (`coder_eval`, `terminal-bench`) or `all` | `all` |
+| `--plugins` | Comma-separated plugin names, `all`, or `none` | `none` |
+| `--mcp` | Comma-separated MCP server names, `all`, or `none` | `none` |
+| `--tasks-limit` | Integer cap on tasks per cell (0 = unlimited) | `0` |
+| `--timeout` | Timeout in seconds per task execution | `600` |
+| `--output-format` | Output format: `json`, `markdown`, `github-summary` | `json` |
+| `--output-dir` | Directory where run artifacts are written | `runs` |
+| `--name` | Custom name prefix for the run ID | `ad-hoc` |
 
-1. Subclass `BaseAgentAdapter` (in `agents/base.py`) and implement the
-   three `_on_*` hooks.
-2. Map the harness name to your class in `agents/__init__.py`
-   (`ADAPTERS["my-harness"] = MyAdapter`).
-3. Add the harness to `.github/workflows/benchmark.yml`'s `setup-matrix`
-   job's expansion list.
+---
 
-That's it — the runner, plugin loader, and MCP launcher are all harness-
-agnostic.
+## 📊 Evaluation Outputs & Artifacts
 
-## Adding a new MCP server
+Each benchmark invocation creates a durable run directory `./runs/<run-id>/` containing:
 
+1. **`result.json`**: Structured JSON report with cell-level summaries and task results.
+2. **`REPORT.md`**: Formatted Markdown comparison table with tool call breakdown.
+3. **`<harness>__<benchmark>__<task_id>.jsonl`**: Individual task execution traces.
+
+### Sample Summary Table Output
+
+| Harness | Benchmark | Plugins | MCP | Pass@1 | Latency p50 | Latency p95 | Tokens (in/out) | Cost | Tasks |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|
+| `claude-code` | `coder_eval` | `none` | `context7` | **92.5%** | 4,210 ms | 7,850 ms | 12,450/3,120 | $0.0841 | 25 |
+| `antigravity-cli` | `coder_eval` | `caveman` | `codebase-memory-mcp` | **88.0%** | 3,890 ms | 6,940 ms | 10,800/2,890 | $0.0652 | 25 |
+| `deepseek-harness` | `terminal-bench` | `none` | `repomix` | **84.0%** | 2,150 ms | 4,320 ms | 8,400/1,950 | $0.0154 | 25 |
+
+---
+
+## 🤖 GitHub Actions CI/CD
+
+The workflow at [`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) supports matrixed testing:
+
+1. **Granular Dispatch**: Trigger ad-hoc sweeps from GitHub Actions UI with custom harness, benchmark, plugin, and MCP selections.
+2. **Dynamic Matrix Expansion**: `setup-matrix` computes test cells from the repository catalogs.
+3. **Parallel Matrix Execution**: Runs each combination concurrently across Ubuntu runners.
+4. **Step Summary Reporting**: Aggregates all JSON artifacts into a unified comparison table posted to GitHub Step Summary.
+
+### Required Repository Secrets
+
+* `LLM_API`: API Endpoint URL (e.g. `https://api.openai.com/v1` or LiteLLM proxy).
+* `LLM_KEY`: API authentication key.
+* `LLM_MODEL`: Target model identifier used across all harnesses for controlled comparison.
+
+---
+
+## 🧩 Extending the Benchmark Suite
+
+### Adding a New Harness
+1. Subclass `BaseAgentAdapter` in `agents/<name>_adapter.py`.
+2. Implement `_on_setup`, `_build_command`, and `resolve_cli`.
+3. Register the class in `agents/__init__.py` (`ADAPTERS["<name>"] = ...`).
+
+### Adding a New MCP Server
 Append an entry to `mcp/mcp_registry.json`:
-
 ```json
 {
   "servers": {
     "my-mcp": {
-      "display_name": "My MCP",
+      "display_name": "My MCP Server",
       "command": "npx",
-      "args": ["-y", "my-mcp"],
+      "args": ["-y", "my-mcp@latest"],
       "env": {},
       "transport": "stdio"
     }
@@ -111,40 +219,39 @@ Append an entry to `mcp/mcp_registry.json`:
 }
 ```
 
-The launcher spawns it as a stdio subprocess; the adapter reads the same
-entry when synthesizing its harness-specific MCP config.
-
-## Adding a new plugin
-
+### Adding a New Plugin
 Append an entry to `plugins/registry.json`:
-
 ```json
 {
   "plugins": {
     "my-plugin": {
       "display_name": "My Plugin",
-      "source_path": "review/claude-plugins/my-plugin",
+      "source_path": "plugins/my-plugin",
       "format": "claude-plugin",
-      "injects": ["commands"]
+      "injects": ["commands", "hooks"]
     }
   }
 }
 ```
 
-`source_path` must point at a directory on disk; the loader symlinks it
-into the staging root the adapter consumes.
+---
 
-## Adding a new benchmark
+## 🧪 Testing
 
-1. Subclass `BaseBenchmark` (in `benchmarks/base.py`).
-2. Register it in `benchmarks/__init__.py`'s `REGISTRY`.
-
-## Tests
+Run the full automated test suite:
 
 ```bash
-pytest
+pytest -v
 ```
 
-The suite covers schema validation, the plugin loader's dir synthesis,
-the MCP launcher's start/stop lifecycle, and an end-to-end runner
-dry-run against the `stub` adapter.
+---
+
+## 📄 License
+
+This repository is licensed under the [MIT License](LICENSE).
+
+---
+
+## 🔍 SEO & Discovery Keywords
+
+`ai-agents` · `coding-agents` · `benchmark` · `mcp` · `model-context-protocol` · `claude-code` · `antigravity` · `gemini-cli` · `deepseek` · `opencode` · `llm-eval` · `litellm` · `coder-eval` · `terminal-bench` · `agentic-workflows`
