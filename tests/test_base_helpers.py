@@ -44,12 +44,16 @@ def test_per_adapter_command_shapes() -> None:
     ]
     assert GeminiCLIAdapter()._build_command("p", Path("/x")) == [
         "gemini",
-        "run",
+        "-p",
         "p",
+        "--yolo",
+        "--output-format",
+        "json",
     ]
     assert OpenCodeAdapter()._build_command("p", Path("/x")) == [
         "opencode",
-        "--non-interactive",
+        "run",
+        "--auto",
         "p",
     ]
 

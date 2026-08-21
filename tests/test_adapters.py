@@ -102,7 +102,7 @@ def test_gemini_adapter_setup_with_mcp(tmp_path: Path, mcp_registry_path: Path) 
         assert settings_path.exists()
         settings = json.loads(settings_path.read_text())
         assert settings["model"]["name"] == "gemini-2.5-flash"
-        assert settings["general"]["defaultApprovalMode"] == "yolo"
+        assert settings["general"]["defaultApprovalMode"] == "auto_edit"
 
         ext_path = ctx.workspace_dir / "gemini-extension.json"
         assert ext_path.exists()

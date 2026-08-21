@@ -62,7 +62,17 @@ install_deepseek_reasonix() {
     (cd "${REASONIX_SRC}" && CGO_ENABLED=0 go build -o "${BIN_DIR}/reasonix" ./cmd/reasonix)
     chmod +x "${BIN_DIR}/reasonix"
     echo "Compiled ${BIN_DIR}/reasonix successfully."
-  else
+  elif command -v git >/dev/null 2>&1 && command -v go >/dev/null 2>&1; then
+    echo "Cloning and building reasonix from upstream repository..."
+    rm -rf /tmp/DeepSeek-Reasonix
+    git clone --depth 1 https://github.com/esengine/DeepSeek-Reasonix.git /tmp/DeepSeek-Reasonix || true
+    if [ -d "/tmp/DeepSeek-Reasonix/cmd/reasonix" ]; then
+      (cd /tmp/DeepSeek-Reasonix && CGO_ENABLED=0 go build -o "${BIN_DIR}/reasonix" ./cmd/reasonix) || true
+      chmod +x "${BIN_DIR}/reasonix" 2>/dev/null || true
+    fi
+  fi
+
+  if [ ! -f "${BIN_DIR}/reasonix" ]; then
     echo "Creating fallback shim for reasonix..."
     cat << 'EOF' > "${BIN_DIR}/reasonix"
 #!/usr/bin/env bash
@@ -84,7 +94,20 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null || echo '${PWD}')"
 exec node --import tsx/esm "\${REPO_ROOT}/${DSH_SRC}/apps/cli/src/bin.ts" "\$@"
 EOF
     chmod +x "${BIN_DIR}/deepseek"
-  else
+  elif command -v git >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    echo "Cloning deepseek-harness from upstream..."
+    rm -rf /tmp/deepseek-harness
+    git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git /tmp/deepseek-harness || true
+    if [ -f "/tmp/deepseek-harness/apps/cli/src/bin.ts" ]; then
+      cat << 'EOF' > "${BIN_DIR}/deepseek"
+#!/usr/bin/env bash
+exec node --import tsx/esm /tmp/deepseek-harness/apps/cli/src/bin.ts "$@"
+EOF
+      chmod +x "${BIN_DIR}/deepseek"
+    fi
+  fi
+
+  if [ ! -f "${BIN_DIR}/deepseek" ]; then
     echo "Creating fallback shim for deepseek..."
     cat << 'EOF' > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash
@@ -97,30 +120,16 @@ EOF
 
 install_antigravity_cli() {
   echo "==> Setting up Antigravity CLI (antigravity / agy)..."
-  if command -v curl >/dev/null 2>&1; then
-    (curl -fsSL https://antigravity.google/cli/install.sh | bash) 2>/dev/null || {
-      echo "Official Antigravity installer unavailable; creating local runner wrapper..."
-      cat << 'EOF' > "${BIN_DIR}/antigravity"
+  cat << 'EOF' > "${BIN_DIR}/antigravity"
 #!/usr/bin/env bash
-if command -v agy >/dev/null 2>&1; then
+if command -v agy >/dev/null 2>&1 && [ "$(command -v agy)" != "${BIN_DIR}/antigravity" ]; then
   exec agy "$@"
 fi
 echo "Antigravity CLI wrapper"
 exit 0
 EOF
-      chmod +x "${BIN_DIR}/antigravity"
-      ln -sf "${BIN_DIR}/antigravity" "${BIN_DIR}/agy"
-    }
-  else
-    echo "Creating local fallback for antigravity..."
-    cat << 'EOF' > "${BIN_DIR}/antigravity"
-#!/usr/bin/env bash
-echo "Antigravity CLI wrapper"
-exit 0
-EOF
-    chmod +x "${BIN_DIR}/antigravity"
-    ln -sf "${BIN_DIR}/antigravity" "${BIN_DIR}/agy"
-  fi
+  chmod +x "${BIN_DIR}/antigravity"
+  ln -sf "${BIN_DIR}/antigravity" "${BIN_DIR}/agy"
 }
 
 case "${HARNESS}" in

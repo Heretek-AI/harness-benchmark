@@ -38,6 +38,7 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             ctx.extra_env["GOOGLE_GENAI_BASE_URL"] = api_base
         if model:
             ctx.extra_env["GEMINI_MODEL"] = model
+        ctx.extra_env["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
 
         # Materialize .gemini/settings.json
         gemini_dir = ctx.workspace_dir / ".gemini"
@@ -47,10 +48,15 @@ class GeminiCLIAdapter(BaseAgentAdapter):
                 "name": model or "gemini-2.5-pro",
             },
             "general": {
-                "defaultApprovalMode": "yolo",
+                "defaultApprovalMode": "auto_edit",
             },
             "output": {
                 "format": "json",
+            },
+            "security": {
+                "folderTrust": {
+                    "enabled": False,
+                },
             },
         }
         (gemini_dir / "settings.json").write_text(json.dumps(settings, indent=2))
@@ -83,7 +89,7 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             )
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "run", prompt]
+        return [self.cli_binary, "-p", prompt, "--yolo", "--output-format", "json"]
 
     @staticmethod
     def resolve_cli() -> str | None:

@@ -271,45 +271,101 @@ class BaseAgentAdapter(abc.ABC):
 
     # ---- parsing hooks (default impls, subclasses override) ----
 
-    def extract_token_usage(self, stdout: str) -> tuple[int | None, int | None]:
-        """Parse harness stdout for token counts.
-
-        Default impl scans for the JSONL ``{"type":"usage",...}`` line shape
-        Claude Code emits under ``--verbose``; other harnesses override.
-        """
+    def _iter_json_objects(self, stdout: str):
+        """Yield parsed JSON objects from JSON array or JSONL lines."""
         import json
+
+        text = stdout.strip()
+        if not text:
+            return
+
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                arr = json.loads(text)
+                if isinstance(arr, list):
+                    for item in arr:
+                        if isinstance(item, dict):
+                            yield item
+                    return
+            except json.JSONDecodeError:
+                pass
 
         for line in stdout.splitlines():
             line = line.strip()
-            if not line.startswith("{"):
+            if not line:
                 continue
             try:
                 obj = json.loads(line)
+                if isinstance(obj, dict):
+                    yield obj
+                elif isinstance(obj, list):
+                    for item in obj:
+                        if isinstance(item, dict):
+                            yield item
             except json.JSONDecodeError:
                 continue
-            if obj.get("type") == "usage":
+
+    def extract_token_usage(self, stdout: str) -> tuple[int | None, int | None]:
+        """Parse harness stdout for token counts."""
+        total_inp: int | None = None
+        total_out: int | None = None
+
+        for obj in self._iter_json_objects(stdout):
+            # Check type == "result" with usage dict (Claude Code JSON output)
+            if obj.get("type") == "result" and isinstance(obj.get("usage"), dict):
+                u = obj["usage"]
+                inp = u.get("input_tokens")
+                out = u.get("output_tokens")
+                if isinstance(inp, int):
+                    total_inp = inp
+                if isinstance(out, int):
+                    total_out = out
+
+            # Check type == "usage"
+            elif obj.get("type") == "usage":
                 inp = obj.get("input_tokens")
                 out = obj.get("output_tokens")
-                if isinstance(inp, int) and isinstance(out, int):
-                    return inp, out
-        return None, None
+                if isinstance(inp, int):
+                    total_inp = (total_inp or 0) + inp
+                if isinstance(out, int):
+                    total_out = (total_out or 0) + out
+
+            # Generic token usage dicts
+            elif isinstance(obj.get("token_usage"), dict):
+                u = obj["token_usage"]
+                inp = u.get("input") or u.get("prompt_tokens")
+                out = u.get("output") or u.get("completion_tokens")
+                if isinstance(inp, int):
+                    total_inp = inp
+                if isinstance(out, int):
+                    total_out = out
+
+        return total_inp, total_out
 
     def count_tool_calls(self, stdout: str) -> dict[str, int]:
         """Count tool invocations by name from the harness's verbose log."""
-        import json
         from collections import Counter
 
         counts: Counter[str] = Counter()
-        for line in stdout.splitlines():
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+        for obj in self._iter_json_objects(stdout):
+            # Direct tool_use event
             if obj.get("type") == "tool_use" and isinstance(obj.get("name"), str):
                 counts[obj["name"]] += 1
+            # Nested message content tool_use (Claude Code)
+            elif obj.get("type") == "assistant" and isinstance(obj.get("message"), dict):
+                content = obj["message"].get("content")
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "tool_use":
+                            name = item.get("name")
+                            if isinstance(name, str):
+                                counts[name] += 1
+            # Function/tool calls list
+            elif isinstance(obj.get("tool_calls"), list):
+                for item in obj["tool_calls"]:
+                    if isinstance(item, dict) and isinstance(item.get("name"), str):
+                        counts[item["name"]] += 1
+
         return dict(counts)
 
     @staticmethod
