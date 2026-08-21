@@ -1,0 +1,10 @@
+name: smoke_test
+description: One harness x one benchmark x no plugins x no MCP x one task. For PR-time sanity checks.
+matrix:
+  harness: [claude-code]
+  benchmark: [coder_eval]
+  plugins: [none]
+  mcp_servers: [none]
+tasks_limit: 1
+timeout_seconds: 120
+output_format: markdown

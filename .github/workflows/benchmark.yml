@@ -1,0 +1,241 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      harness:
+        description: "Harness to run (or 'all')"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - antigravity-cli
+          - claude-code
+          - opencode
+          - gemini-cli
+          - deepseek-harness
+          - DeepSeek-Reasonix
+      benchmark:
+        description: "Benchmark suite (or 'all')"
+        required: true
+        type: choice
+        default: coder_eval
+        options:
+          - all
+          - coder_eval
+          - terminal-bench
+      plugins:
+        description: "Comma-separated plugin names, 'all', or 'none'"
+        required: false
+        type: string
+        default: none
+      mcp_servers:
+        description: "Comma-separated MCP server names, 'all', or 'none'"
+        required: false
+        type: string
+        default: none
+      task_limit:
+        description: "Max tasks per cell (0 = full run)"
+        required: false
+        type: number
+        default: 5
+  push:
+    branches: [main]
+    paths:
+      - "agents/**"
+      - "plugins/**"
+      - "mcp/**"
+      - "benchmarks/**"
+      - "metrics/**"
+      - "configs/**"
+      - "run_benchmark.py"
+      - ".github/workflows/benchmark.yml"
+  schedule:
+    # Nightly full sweep at 04:07 UTC (off-hour, off-round-minute)
+    - cron: "7 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  # ----- matrix expansion -----
+  # Reads the registries and emits one JSON matrix that downstream jobs fan
+  # out over. Using a setup job keeps the workflow YAML itself static.
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.expand.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compute matrix
+        id: expand
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          repo = Path.cwd()
+
+          # Resolve "all" tokens against the registries we ship.
+          import yaml
+
+          preset_path = repo / "configs" / "presets" / "full_matrix.yaml"
+          preset = yaml.safe_load(preset_path.read_text()) if preset_path.exists() else {"matrix": {}}
+          registry = json.loads((repo / "plugins" / "registry.json").read_text())
+          mcp_registry = json.loads((repo / "mcp" / "mcp_registry.json").read_text())
+
+          # CLI inputs (only meaningful for workflow_dispatch).
+          harness_in = "${{ github.event.inputs.harness }}" or "all"
+          benchmark_in = "${{ github.event.inputs.benchmark }}" or "all"
+          plugins_in = "${{ github.event.inputs.plugins }}" or "none"
+          mcp_in = "${{ github.event.inputs.mcp_servers }}" or "none"
+          task_limit_in = int("${{ github.event.inputs.task_limit }}" or "5")
+
+          def expand(token, items):
+              if token == "all":
+                  return items
+              if token in ("none", "", None):
+                  return ["none"]
+              return [t.strip() for t in token.split(",") if t.strip()]
+
+          matrix = {
+              "harness": [harness_in] if harness_in != "all" else [
+                  "claude-code", "gemini-cli", "opencode",
+                  "deepseek-harness", "antigravity-cli",
+              ],
+              "benchmark": [benchmark_in] if benchmark_in != "all" else [
+                  "coder_eval", "terminal-bench",
+              ],
+              "plugins": expand(plugins_in, sorted(registry["plugins"])),
+              "mcp_servers": expand(mcp_in, sorted(mcp_registry["servers"])),
+              "task_limit": [task_limit_in],
+              "preset": ["smoke_test"] if task_limit_in > 0 and task_limit_in < 6 else ["full_matrix"],
+          }
+          Path("matrix.json").write_text(json.dumps(matrix))
+          # Strip nested includes for output (GitHub's matrix limit).
+          slim = {k: v for k, v in matrix.items() if k != "preset"}
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"matrix={json.dumps(slim)}\n")
+
+  benchmark:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+    env:
+      LLM_API: ${{ secrets.LLM_API }}
+      LLM_KEY: ${{ secrets.LLM_KEY }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      HARNESS_BENCH_MCP_REGISTRY: ${{ github.workspace }}/mcp/mcp_registry.json
+      HARNESS_BENCH_PLUGIN_REGISTRY: ${{ github.workspace }}/plugins/registry.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run benchmark cell
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "cell: harness=${{ matrix.harness }} benchmark=${{ matrix.benchmark }} plugins=${{ matrix.plugins }} mcp=${{ matrix.mcp_servers }} tasks=${{ matrix.task_limit }}"
+          python run_benchmark.py \
+            --name "ci-${{ github.run_id }}" \
+            --harness "${{ matrix.harness }}" \
+            --benchmark "${{ matrix.benchmark }}" \
+            --plugins "${{ matrix.plugins }}" \
+            --mcp "${{ matrix.mcp_servers }}" \
+            --tasks-limit "${{ matrix.task_limit }}" \
+            --timeout 1200 \
+            --output-format "${{ github.event_name == 'workflow_dispatch' && 'github-summary' || 'json' }}" \
+            --output-dir runs
+      - name: Upload run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.harness }}-${{ matrix.benchmark }}-${{ matrix.plugins }}-${{ matrix.mcp_servers }}
+          path: runs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: runs-aggregate
+          pattern: bench-*
+          merge-multiple: true
+      - name: Aggregate and write step summary
+        env:
+          GITHUB_STEP_SUMMARY: ${{ github.summary }}
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+
+          root = Path("runs-aggregate")
+          runs = []
+          for p in root.rglob("result.json"):
+              try:
+                  runs.append(json.loads(p.read_text()))
+              except json.JSONDecodeError:
+                  pass
+
+          if not runs:
+              print("No result.json files found; skipping summary.")
+              raise SystemExit(0)
+
+          md = [f"## Harness benchmark — run `${{ github.run_id }}`", ""]
+          md.append("| Harness | Benchmark | Plugins | MCP | Pass@1 | Latency p50 | p95 | Tokens (in/out) | Cost | Tasks |")
+          md.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|")
+          for run in runs:
+              for cell in run.get("summaries", []):
+                  s = cell["summary"]
+                  md.append(
+                      f"| {cell['harness']} | {cell['benchmark']} | "
+                      f"{','.join(cell['plugins']) or 'none'} | "
+                      f"{','.join(cell['mcp_servers']) or 'none'} | "
+                      f"{(s.get('pass_rate') or 0)*100:.1f}% | "
+                      f"{(s.get('latency_p50') or 0)*1000:.0f} ms | "
+                      f"{(s.get('latency_p95') or 0)*1000:.0f} ms | "
+                      f"{s.get('tokens_input_total', 0):,}/{s.get('tokens_output_total', 0):,} | "
+                      f"${s.get('cost_usd_total', 0):.4f} | "
+                      f"{s.get('count', 0)} |"
+                  )
+
+          summary = "\n".join(md) + "\n"
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_path, "a") as f:
+              f.write(summary)
+          (Path("runs") / "REPORT.md").write_text(summary)
+      - name: Upload aggregated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: runs/REPORT.md
+          retention-days: 90

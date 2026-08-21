@@ -1,0 +1,24 @@
+name: full_matrix
+description: Full nightly sweep across every registered (agent x benchmark x plugin x MCP). Plugins and MCPs are sampled one-at-a-time to keep combinatorial blowup manageable.
+matrix:
+  harness: [claude-code, gemini-cli, opencode, deepseek-harness, antigravity-cli]
+  benchmark: [coder_eval, terminal-bench]
+  plugins:
+    - none
+    - caveman
+    - claude-mem
+    - ECC
+    - graphify
+    - headroom
+    - ponytail
+    - rtk
+    - Understand-Anything
+  mcp_servers:
+    - none
+    - chrome-devtools-mcp
+    - codebase-memory-mcp
+    - context7
+    - repomix
+tasks_limit: 0
+timeout_seconds: 900
+output_format: json

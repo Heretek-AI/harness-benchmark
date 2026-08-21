@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["plugins"],
+  "properties": {
+    "description": { "type": "string" },
+    "plugins": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["display_name", "source_path", "format", "injects"],
+        "properties": {
+          "display_name": { "type": "string" },
+          "source_path": { "type": "string" },
+          "format": { "type": "string" },
+          "injects": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["commands", "agents", "hooks", "mcp"]
+            }
+          },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}
