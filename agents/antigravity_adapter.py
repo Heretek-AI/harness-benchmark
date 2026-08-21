@@ -25,9 +25,23 @@ class AntigravityAdapter(BaseAgentAdapter):
         plugins: list[str],
         mcp_servers: list[str],
     ) -> None:
+        api_base, api_key, model = self.get_llm_config(ctx)
+
+        # Bridge environment variables
+        if api_base:
+            ctx.extra_env["ANTIGRAVITY_API_BASE"] = api_base
+            ctx.extra_env["LLM_API"] = api_base
+        if api_key:
+            ctx.extra_env["ANTIGRAVITY_API_KEY"] = api_key
+            ctx.extra_env["LLM_KEY"] = api_key
+        if model:
+            ctx.extra_env["ANTIGRAVITY_MODEL"] = model
+            ctx.extra_env["LLM_MODEL"] = model
+
         config = {
-            "api_base": "${LLM_API}",
-            "model": "${LLM_MODEL}",
+            "api_base": api_base,
+            "api_key": api_key,
+            "model": model,
             "workspace": str(ctx.workspace_dir),
         }
         config_dir = ctx.workspace_dir / ".antigravity"

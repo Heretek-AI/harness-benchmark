@@ -27,11 +27,38 @@ class GeminiCLIAdapter(BaseAgentAdapter):
         plugins: list[str],
         mcp_servers: list[str],
     ) -> None:
+        api_base, api_key, model = self.get_llm_config(ctx)
+
+        # Bridge environment variables
+        if api_key:
+            ctx.extra_env["GEMINI_API_KEY"] = api_key
+            ctx.extra_env["GOOGLE_API_KEY"] = api_key
+        if api_base:
+            ctx.extra_env["GEMINI_API_BASE"] = api_base
+            ctx.extra_env["GOOGLE_GENAI_BASE_URL"] = api_base
+        if model:
+            ctx.extra_env["GEMINI_MODEL"] = model
+
+        # Materialize .gemini/settings.json
+        gemini_dir = ctx.workspace_dir / ".gemini"
+        gemini_dir.mkdir(parents=True, exist_ok=True)
+        settings = {
+            "model": {
+                "name": model or "gemini-2.5-pro",
+            },
+            "general": {
+                "defaultApprovalMode": "yolo",
+            },
+            "output": {
+                "format": "json",
+            },
+        }
+        (gemini_dir / "settings.json").write_text(json.dumps(settings, indent=2))
+
+        # MCP extensions
         if mcp_servers and mcp_servers != ["none"]:
             ext: dict = {"name": "harness-bench", "mcpServers": {}}
             for name in mcp_servers:
-                # The runner passes the registry path via env; we read it
-                # here to mirror Claude Code's approach.
                 registry_path = os.environ.get("HARNESS_BENCH_MCP_REGISTRY")
                 if registry_path is None:
                     candidate = (

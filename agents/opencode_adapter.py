@@ -26,12 +26,33 @@ class OpenCodeAdapter(BaseAgentAdapter):
         plugins: list[str],
         mcp_servers: list[str],
     ) -> None:
+        api_base, api_key, model = self.get_llm_config(ctx)
+        target_model = model or "default"
+
+        # Bridge environment variables
+        if api_base:
+            ctx.extra_env["OPENAI_API_BASE"] = api_base
+            ctx.extra_env["OPENAI_BASE_URL"] = api_base
+            ctx.extra_env["LITELLM_URL"] = api_base
+        if api_key:
+            ctx.extra_env["OPENAI_API_KEY"] = api_key
+            ctx.extra_env["LITELLM_KEY"] = api_key
+
         cfg = {
+            "$schema": "https://opencode.ai/config.json",
+            "model": f"litellm/{target_model}",
             "provider": {
-                "name": "litellm",
-                "api_base": "${LLM_API}",
-                "api_key": "${LLM_KEY}",
-                "model": "${LLM_MODEL}",
+                "litellm": {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "LiteLLM",
+                    "options": {
+                        "baseURL": api_base or "http://localhost:4000/v1",
+                        "apiKey": api_key,
+                    },
+                    "models": {
+                        target_model: {"name": target_model}
+                    },
+                }
             },
             "mcp_servers": list(mcp_servers),
         }

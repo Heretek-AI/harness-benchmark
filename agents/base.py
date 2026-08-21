@@ -115,6 +115,15 @@ class BaseAgentAdapter(abc.ABC):
             raise
         return self._ctx
 
+    def get_llm_config(self, ctx: AdapterContext | None = None) -> tuple[str, str, str]:
+        """Resolve (api_base, api_key, model) from adapter context or ambient environment."""
+        target_ctx = ctx or self._ctx
+        env = target_ctx.extra_env if target_ctx else {}
+        api_base = env.get("LLM_API") or os.environ.get("LLM_API", "")
+        api_key = env.get("LLM_KEY") or os.environ.get("LLM_KEY", "")
+        model = env.get("LLM_MODEL") or os.environ.get("LLM_MODEL", "")
+        return api_base, api_key, model
+
     def execute_task(
         self,
         prompt: str,

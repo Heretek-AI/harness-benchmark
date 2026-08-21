@@ -49,6 +49,32 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         plugins: list[str],
         mcp_servers: list[str],
     ) -> None:
+        api_base, api_key, model = self.get_llm_config(ctx)
+
+        # Bridge environment variables
+        if api_base:
+            ctx.extra_env["ANTHROPIC_BASE_URL"] = api_base
+        if api_key:
+            ctx.extra_env["ANTHROPIC_API_KEY"] = api_key
+            ctx.extra_env["ANTHROPIC_AUTH_TOKEN"] = api_key
+        if model:
+            ctx.extra_env["ANTHROPIC_MODEL"] = model
+            ctx.extra_env["CLAUDE_MODEL"] = model
+
+        # Materialize .claude/settings.json in workspace
+        claude_dir = ctx.workspace_dir / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        settings = {
+            "env": {
+                "ANTHROPIC_BASE_URL": api_base,
+                "ANTHROPIC_API_KEY": api_key,
+                "ANTHROPIC_AUTH_TOKEN": api_key,
+                "ANTHROPIC_MODEL": model,
+            },
+            "model": model,
+        }
+        (claude_dir / "settings.json").write_text(json.dumps(settings, indent=2))
+
         # Plugin dir: the loader has already materialized one (or more)
         # plugins into ctx.plugin_dir if the run requested any. Claude Code
         # accepts a single --plugin-dir per invocation, so we expect exactly
