@@ -9,24 +9,19 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  actions: read
 
 jobs:
-  publish-pr-comment:
+  publish-report:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.pull_requests != '[]'
     steps:
-      - name: Download report artifact and comment
+      - name: Download report artifact and publish summary
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prs = context.payload.workflow_run.pull_requests;
-            if (!prs || prs.length === 0) {
-              core.info('No associated pull request found for this workflow run.');
-              return;
-            }
-            const prNumber = prs[0].number;
             const runId = context.payload.workflow_run.id;
+            core.info(`Processing benchmark report for completed workflow run: ${runId}`);
 
             // List artifacts from the completed workflow run
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -44,15 +39,19 @@ jobs:
               return;
             }
 
-            core.info(`Found bench-report artifact (id: ${reportArtifact.id}) for PR #${prNumber}`);
+            core.info(`Found bench-report artifact (id: ${reportArtifact.id})`);
             
-            const commentBody = `### 🤖 Benchmark Run Completed (Run #${runId})\n\n` +
-              `Benchmark results have been published to the [Workflow Run Summary](${context.payload.workflow_run.html_url}).\n\n` +
-              `Artifacts retention: 90 days. Check the step summary for full per-harness metrics.`;
+            const prs = context.payload.workflow_run.pull_requests;
+            if (prs && prs.length > 0) {
+              const prNumber = prs[0].number;
+              const commentBody = `### 🤖 Benchmark Run Completed (Run #${runId})\n\n` +
+                `Benchmark results have been published to the [Workflow Run Summary](${context.payload.workflow_run.html_url}).\n\n` +
+                `Artifacts retention: 90 days. Check the step summary for full per-harness metrics.`;
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: commentBody,
-            });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+            }

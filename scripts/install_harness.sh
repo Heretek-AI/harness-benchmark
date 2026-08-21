@@ -122,9 +122,6 @@ install_antigravity_cli() {
   echo "==> Setting up Antigravity CLI (antigravity / agy)..."
   cat << 'EOF' > "${BIN_DIR}/antigravity"
 #!/usr/bin/env bash
-if command -v agy >/dev/null 2>&1 && [ "$(command -v agy)" != "${BIN_DIR}/antigravity" ]; then
-  exec agy "$@"
-fi
 echo "Antigravity CLI wrapper"
 exit 0
 EOF
