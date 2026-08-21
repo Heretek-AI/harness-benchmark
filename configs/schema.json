@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Harness Benchmark Run Configuration",
+  "description": "Schema for benchmark run configs (presets and CLI inputs). One config drives one matrix of (harness x benchmark x plugins x mcp) runs.",
+  "type": "object",
+  "required": ["name", "matrix"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable run name; becomes the run-id prefix."
+    },
+    "description": {
+      "type": "string"
+    },
+    "matrix": {
+      "type": "object",
+      "description": "Cartesian product inputs; each list expands into a separate job.",
+      "additionalProperties": false,
+      "properties": {
+        "harness": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Adapter names or ['all']. 'all' expands to every registered adapter."
+        },
+        "benchmark": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Benchmark names or ['all']."
+        },
+        "plugins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Plugin names, ['none'], or ['all']."
+        },
+        "mcp_servers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "MCP server names, ['none'], or ['all']."
+        }
+      }
+    },
+    "tasks_limit": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Cap tasks per (harness, benchmark) pair. 0 = unlimited."
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 600
+    },
+    "output_format": {
+      "type": "string",
+      "enum": ["json", "markdown", "github-summary"],
+      "default": "json"
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Extra env vars to inject into adapter.setup."
+    }
+  }
+}

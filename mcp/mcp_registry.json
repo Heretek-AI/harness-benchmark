@@ -1,0 +1,40 @@
+{
+  "$schema": "./mcp_registry.schema.json",
+  "description": "Catalog of MCP servers the benchmark suite can launch and inject into any agent. 'command' + 'args' define the stdio transport; switch to SSE via transport='sse' and 'url'.",
+  "servers": {
+    "chrome-devtools-mcp": {
+      "display_name": "Chrome DevTools MCP",
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"],
+      "env": {},
+      "transport": "stdio",
+      "source_path": "review/mcp/chrome-devtools-mcp"
+    },
+    "codebase-memory-mcp": {
+      "display_name": "Codebase Memory MCP",
+      "command": "uvx",
+      "args": ["codebase-memory-mcp"],
+      "env": {},
+      "transport": "stdio",
+      "source_path": "review/mcp/codebase-memory-mcp"
+    },
+    "context7": {
+      "display_name": "Context7",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "env": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY:-}"
+      },
+      "transport": "stdio",
+      "source_path": "review/mcp/context7"
+    },
+    "repomix": {
+      "display_name": "Repomix MCP",
+      "command": "npx",
+      "args": ["-y", "repomix", "--mcp"],
+      "env": {},
+      "transport": "stdio",
+      "source_path": "review/mcp/repomix"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+name: mcp_isolation
+description: claude-code x coder_eval with each MCP isolated; helps attribute regressions to a specific MCP server.
+matrix:
+  harness: [claude-code]
+  benchmark: [coder_eval]
+  plugins: [none]
+  mcp_servers:
+    - chrome-devtools-mcp
+    - codebase-memory-mcp
+    - context7
+    - repomix
+tasks_limit: 3
+timeout_seconds: 600
+output_format: markdown

@@ -1,0 +1,62 @@
+{
+  "$schema": "./registry.schema.json",
+  "description": "Catalog of Claude plugins the benchmark suite can inject. Each entry tells PluginLoader where the plugin lives on disk and which injection points it provides.",
+  "plugins": {
+    "caveman": {
+      "display_name": "Caveman",
+      "source_path": "review/claude-plugins/caveman",
+      "format": "claude-plugin",
+      "injects": ["commands", "agents"],
+      "description": "Primitivist reasoning style plugin."
+    },
+    "claude-mem": {
+      "display_name": "Claude Mem",
+      "source_path": "review/claude-plugins/claude-mem",
+      "format": "claude-plugin",
+      "injects": ["hooks", "commands"],
+      "description": "Cross-session persistent memory plugin."
+    },
+    "ECC": {
+      "display_name": "ECC",
+      "source_path": "review/claude-plugins/ECC",
+      "format": "claude-plugin",
+      "injects": ["commands", "hooks"],
+      "description": "Error-Correction Cycle plugin."
+    },
+    "graphify": {
+      "display_name": "Graphify",
+      "source_path": "review/claude-plugins/graphify",
+      "format": "claude-plugin",
+      "injects": ["commands", "agents"],
+      "description": "Graph-based code comprehension plugin."
+    },
+    "headroom": {
+      "display_name": "Headroom",
+      "source_path": "review/claude-plugins/headroom",
+      "format": "claude-plugin",
+      "injects": ["commands", "hooks"],
+      "description": "Context-window budget tracking plugin."
+    },
+    "ponytail": {
+      "display_name": "Ponytail",
+      "source_path": "review/claude-plugins/ponytail",
+      "format": "claude-plugin",
+      "injects": ["commands"],
+      "description": "Compact command bundle plugin."
+    },
+    "rtk": {
+      "display_name": "RTK",
+      "source_path": "review/claude-plugins/rtk",
+      "format": "claude-plugin",
+      "injects": ["commands"],
+      "description": "Rust-toolkit command set plugin."
+    },
+    "Understand-Anything": {
+      "display_name": "Understand Anything",
+      "source_path": "review/claude-plugins/Understand-Anything",
+      "format": "claude-plugin",
+      "injects": ["commands", "agents"],
+      "description": "Codebase explanation plugin."
+    }
+  }
+}

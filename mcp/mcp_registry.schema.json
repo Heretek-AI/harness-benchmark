@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["servers"],
+  "properties": {
+    "description": { "type": "string" },
+    "servers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["display_name", "command", "transport"],
+        "properties": {
+          "display_name": { "type": "string" },
+          "command": { "type": "string" },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "transport": {
+            "type": "string",
+            "enum": ["stdio", "sse"]
+          },
+          "url": { "type": "string" },
+          "source_path": { "type": "string" }
+        }
+      }
+    }
+  }
+}
