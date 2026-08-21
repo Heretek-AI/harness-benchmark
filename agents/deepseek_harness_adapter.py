@@ -80,12 +80,16 @@ class DeepSeekReasonixAdapter(DeepSeekHarnessAdapter):
         if api_base:
             ctx.extra_env["OPENAI_BASE"] = api_base
             ctx.extra_env["OPENAI_BASE_URL"] = api_base
+            ctx.extra_env["DEEPSEEK_BASE_URL"] = api_base
         if model:
             ctx.extra_env["REASONIX_MODEL"] = model
+            ctx.extra_env["DEEPSEEK_MODEL"] = model
 
-        # Materialize reasonix.toml in workspace
+        ctx.extra_env["REASONIX_HOME"] = str(ctx.workspace_dir)
+
+        # Materialize reasonix.toml and config.toml in workspace
         toml_content = f"""# Reasonix benchmark configuration
-default_model = "litellm/{target_model}"
+default_model = "litellm"
 
 [agent]
 temperature = 0.0
@@ -95,11 +99,13 @@ compact_ratio = 0.80
 name = "litellm"
 kind = "openai"
 base_url = "{base_url}"
+model = "{target_model}"
 models = ["{target_model}"]
 default = "{target_model}"
 api_key_env = "REASONIX_API_KEY"
 """
         (ctx.workspace_dir / "reasonix.toml").write_text(toml_content)
+        (ctx.workspace_dir / "config.toml").write_text(toml_content)
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
         return [self.cli_binary, "run", "--auto", "--output-format", "json", prompt]

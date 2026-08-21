@@ -180,7 +180,7 @@ def test_deepseek_reasonix_adapter_setup(tmp_path: Path) -> None:
         toml_path = ctx.workspace_dir / "reasonix.toml"
         assert toml_path.exists()
         content = toml_path.read_text()
-        assert 'default_model = "litellm/deepseek-v4-pro"' in content
+        assert 'default_model = "litellm"' in content
         assert 'base_url = "https://api.deepseek.com/v1"' in content
         assert 'api_key_env = "REASONIX_API_KEY"' in content
         assert ctx.extra_env["REASONIX_API_KEY"] == "sk-reasonix-key"

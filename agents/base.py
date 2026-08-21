@@ -311,7 +311,7 @@ class BaseAgentAdapter(abc.ABC):
         total_out: int | None = None
 
         for obj in self._iter_json_objects(stdout):
-            # Check type == "result" with usage dict (Claude Code JSON output)
+            # Check type == "result" with usage dict (Claude Code / Agent Engine JSON output)
             if obj.get("type") == "result" and isinstance(obj.get("usage"), dict):
                 u = obj["usage"]
                 inp = u.get("input_tokens")
@@ -320,6 +320,17 @@ class BaseAgentAdapter(abc.ABC):
                     total_inp = inp
                 if isinstance(out, int):
                     total_out = out
+
+            # OpenCode step_finish: {"type": "step_finish", "part": {"tokens": {"input": 8377, "output": 76}}}
+            part = obj.get("part") if isinstance(obj.get("part"), dict) else None
+            if part and isinstance(part.get("tokens"), dict):
+                toks = part["tokens"]
+                inp = toks.get("input") or toks.get("input_tokens")
+                out = toks.get("output") or toks.get("output_tokens")
+                if isinstance(inp, int):
+                    total_inp = max(total_inp or 0, inp)
+                if isinstance(out, int):
+                    total_out = max(total_out or 0, out)
 
             # Check type == "usage"
             elif obj.get("type") == "usage":
@@ -349,8 +360,14 @@ class BaseAgentAdapter(abc.ABC):
         counts: Counter[str] = Counter()
         for obj in self._iter_json_objects(stdout):
             # Direct tool_use event
-            if obj.get("type") == "tool_use" and isinstance(obj.get("name"), str):
-                counts[obj["name"]] += 1
+            if obj.get("type") == "tool_use":
+                if isinstance(obj.get("name"), str):
+                    counts[obj["name"]] += 1
+                part = obj.get("part") if isinstance(obj.get("part"), dict) else None
+                if part:
+                    tool_name = part.get("tool") or part.get("name")
+                    if isinstance(tool_name, str):
+                        counts[tool_name] += 1
             # Nested message content tool_use (Claude Code)
             elif obj.get("type") == "assistant" and isinstance(obj.get("message"), dict):
                 content = obj["message"].get("content")
