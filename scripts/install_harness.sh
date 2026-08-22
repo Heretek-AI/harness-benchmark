@@ -35,8 +35,16 @@ install_claude_code() {
 }
 
 install_gemini_cli() {
-  echo "==> Setting up Gemini CLI..."
-  cat << 'EOF' > "${BIN_DIR}/gemini"
+  echo "==> Installing Google Gemini CLI..."
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @google/gemini-cli || {
+      echo "npm global install failed; falling back to local user install"
+      npm install --prefix "${HOME}/.local" -g @google/gemini-cli || true
+    }
+  fi
+  if [ ! -f "${BIN_DIR}/gemini" ] && ! command -v gemini >/dev/null 2>&1; then
+    echo "Creating fallback runner for gemini-cli..."
+    cat << 'EOF' > "${BIN_DIR}/gemini"
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "${DIR}/agent_engine.py" ]; then
@@ -45,7 +53,8 @@ fi
 echo "Gemini CLI wrapper"
 exit 0
 EOF
-  chmod +x "${BIN_DIR}/gemini"
+    chmod +x "${BIN_DIR}/gemini"
+  fi
 }
 
 install_opencode() {
@@ -98,10 +107,14 @@ EOF
 install_deepseek_harness() {
   echo "==> Setting up DeepSeek Harness CLI (deepseek)..."
   if command -v npm >/dev/null 2>&1; then
-    npm install -g tsx || true
+    npm install -g pnpm tsx || true
   fi
   local DSH_SRC="review/agents/deepseek-harness"
-  if [ -d "${DSH_SRC}" ] && [ -f "${DSH_SRC}/apps/cli/src/bin.ts" ] && command -v node >/dev/null 2>&1 && command -v tsx >/dev/null 2>&1; then
+  if [ -d "${DSH_SRC}" ] && [ -f "${DSH_SRC}/apps/cli/src/bin.ts" ] && command -v node >/dev/null 2>&1; then
+    echo "Building dependencies for deepseek-harness..."
+    if command -v pnpm >/dev/null 2>&1; then
+      (cd "${DSH_SRC}" && pnpm install --no-frozen-lockfile 2>/dev/null || true)
+    fi
     echo "Creating Node runner shim for deepseek-harness..."
     cat << EOF > "${BIN_DIR}/deepseek"
 #!/usr/bin/env bash
@@ -109,6 +122,7 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null || echo '${PWD}')"
 exec node --import tsx/esm "\${REPO_ROOT}/${DSH_SRC}/apps/cli/src/bin.ts" "\$@"
 EOF
     chmod +x "${BIN_DIR}/deepseek"
+    ln -sf "${BIN_DIR}/deepseek" "${BIN_DIR}/dsh"
   else
     echo "Creating Agent Engine runner for deepseek / dsh..."
     cat << 'EOF' > "${BIN_DIR}/deepseek"

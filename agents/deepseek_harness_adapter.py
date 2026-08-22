@@ -106,6 +106,10 @@ default_model = "litellm"
 temperature = 0.0
 compact_ratio = 0.80
 
+[sandbox]
+bash = "off"
+network = true
+
 [[providers]]
 name = "litellm"
 kind = "openai"

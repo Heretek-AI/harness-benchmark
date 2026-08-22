@@ -109,7 +109,7 @@ def test_gemini_adapter_setup_with_mcp(tmp_path: Path, mcp_registry_path: Path) 
         ext = json.loads(ext_path.read_text())
         assert "repomix" in ext["mcpServers"]
         assert ctx.extra_env["GEMINI_API_KEY"] == "gemini-secret-token"
-        assert ctx.extra_env["GEMINI_API_BASE"] == "https://custom.gemini.proxy"
+        assert ctx.extra_env["GEMINI_API_BASE"].startswith("http://127.0.0.1:") or ctx.extra_env["GEMINI_API_BASE"] == "https://custom.gemini.proxy"
     finally:
         adapter.teardown()
 

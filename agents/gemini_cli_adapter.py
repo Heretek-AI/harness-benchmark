@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from pathlib import Path as _P
 
 from agents.base import AdapterContext, BaseAgentAdapter
@@ -29,12 +30,43 @@ class GeminiCLIAdapter(BaseAgentAdapter):
     ) -> None:
         api_base, api_key, model = self.get_llm_config(ctx)
 
-        # Bridge environment variables
+        # Launch background translation bridge for custom endpoints
+        import socket
+        import subprocess
+
+        s = socket.socket()
+        s.bind(("", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        bridge_script = _P(__file__).parent / "gemini_bridge.py"
+        if bridge_script.exists():
+            bridge_env = os.environ.copy()
+            if api_base:
+                bridge_env["LLM_API"] = api_base
+            if api_key:
+                bridge_env["LLM_KEY"] = api_key
+            if model:
+                bridge_env["LLM_MODEL"] = model
+
+            proc = subprocess.Popen(
+                [sys.executable, str(bridge_script), "--port", str(port)],
+                env=bridge_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            ctx.child_pids.append(proc.pid)
+            bridge_url = f"http://127.0.0.1:{port}"
+            ctx.extra_env["GOOGLE_GEMINI_BASE_URL"] = bridge_url
+            ctx.extra_env["GEMINI_API_BASE"] = bridge_url
+
         if api_key:
             ctx.extra_env["GEMINI_API_KEY"] = api_key
             ctx.extra_env["GOOGLE_API_KEY"] = api_key
-        if api_base:
-            ctx.extra_env["GEMINI_API_BASE"] = api_base
+        else:
+            ctx.extra_env["GEMINI_API_KEY"] = "gemini-api-key"
+            ctx.extra_env["GOOGLE_API_KEY"] = "gemini-api-key"
+
         if model:
             ctx.extra_env["GEMINI_MODEL"] = model
         ctx.extra_env["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
