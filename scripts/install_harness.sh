@@ -15,7 +15,15 @@ mkdir -p "${BIN_DIR}"
 export PATH="${BIN_DIR}:${PATH}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/agent_engine.py" ]; then
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# The agent engine was promoted from scripts/agent_engine.py to
+# agents/agent_engine.py. Copy from the new location when present.
+AGENT_ENGINE_SRC="${REPO_ROOT}/agents/agent_engine.py"
+if [ -f "${AGENT_ENGINE_SRC}" ]; then
+  cp -f "${AGENT_ENGINE_SRC}" "${BIN_DIR}/agent_engine.py"
+  chmod +x "${BIN_DIR}/agent_engine.py"
+elif [ -f "${SCRIPT_DIR}/agent_engine.py" ]; then
+  # Legacy fallback for callers still running an older layout.
   cp -f "${SCRIPT_DIR}/agent_engine.py" "${BIN_DIR}/agent_engine.py"
   chmod +x "${BIN_DIR}/agent_engine.py"
 fi

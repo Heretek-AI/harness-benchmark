@@ -45,7 +45,12 @@ class MetricCollector:
 
     @staticmethod
     def infer_tier(plugins: list[str], mcp_servers: list[str], lsp_enabled: bool = False) -> str:
-        """Infer deterministic ablation tier from components."""
+        """Infer deterministic ablation tier from components.
+
+        ``lsp_enabled`` is an explicit boolean (not a proxy from
+        ``lsp_diagnostics``); an empty diagnostics list must NOT be read
+        as "LSP disabled".
+        """
         has_plugins = bool(plugins and plugins != ["none"])
         has_mcp = bool(mcp_servers and mcp_servers != ["none"])
 
@@ -116,7 +121,11 @@ class MetricCollector:
                 failure_counts[cat] += 1
 
         first_r = rows[0]
-        tier = self.infer_tier(first_r.plugins, first_r.mcp_servers, bool(getattr(first_r, "lsp_diagnostics", None)))
+        tier = self.infer_tier(
+            first_r.plugins,
+            first_r.mcp_servers,
+            bool(getattr(first_r, "lsp_enabled", False)),
+        )
 
         return {
             "tier": tier,

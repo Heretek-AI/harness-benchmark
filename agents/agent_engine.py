@@ -1,22 +1,22 @@
-#!/usr/bin/env python3
-"""Unified Multi-Turn Autonomous Agent Engine for Harness Benchmark.
+"""Unified Multi-Turn Autonomous Agent Engine (importable module).
 
-Executes real iterative ReAct coding agent loops against OpenAI, Anthropic, or LiteLLM endpoints.
-Provides complete agent system prompts, tool schemas (bash, write_file, read_file),
-multi-turn observation feedback, full token accumulation, tool invocation tracking,
-and workspace action execution.
+Executes real iterative ReAct coding agent loops against OpenAI,
+Anthropic, or LiteLLM endpoints. Provides complete agent system prompts,
+tool schemas (``execute_bash`` / ``write_file`` / ``read_file``),
+multi-turn observation feedback, full token accumulation, tool
+invocation tracking, and workspace action execution.
+
+This module is the canonical import target used by the
+``agent-engine`` adapter (``agents/agent_engine_adapter.py``) and by
+the fallback transport on any adapter whose CLI is missing.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
-import os
 import re
 import subprocess
-import sys
 import time
-import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -69,11 +69,15 @@ def call_llm_turn(
     model: str,
     messages: list[dict[str, str]],
 ) -> tuple[str, int, int]:
-    """Invoke one LLM conversation turn via Anthropic or OpenAI endpoint."""
+    """Invoke one LLM conversation turn via Anthropic or OpenAI endpoint.
+
+    Tries four candidate URL shapes (``/messages``, ``/v1/messages``,
+    ``/chat/completions``, ``/v1/chat/completions``) and returns on the
+    first 2xx response.
+    """
     base = (api_base or "http://localhost:4000/v1").rstrip("/")
     target_model = model or "MiniMax-M3"
 
-    # Prepare Anthropic format
     headers_anthropic = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
@@ -90,7 +94,6 @@ def call_llm_turn(
         "messages": anthropic_msgs if anthropic_msgs else [{"role": "user", "content": "Begin."}],
     }
 
-    # Prepare OpenAI format
     headers_openai = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
@@ -109,7 +112,7 @@ def call_llm_turn(
         (f"{base}/v1/chat/completions", headers_openai, payload_openai),
     ]
 
-    last_error = None
+    last_error: Exception | None = None
     for url, headers, payload in candidates:
         try:
             req = urllib.request.Request(
@@ -124,7 +127,6 @@ def call_llm_turn(
                     continue
                 data = json.loads(body)
 
-                # Parse Anthropic shape
                 if "content" in data and isinstance(data["content"], list):
                     content = "".join(
                         [b.get("text", "") for b in data["content"] if isinstance(b, dict) and b.get("type") == "text"]
@@ -132,8 +134,7 @@ def call_llm_turn(
                     usage = data.get("usage", {})
                     return content, usage.get("input_tokens", 0), usage.get("output_tokens", 0)
 
-                # Parse OpenAI shape
-                elif "choices" in data and isinstance(data["choices"], list):
+                if "choices" in data and isinstance(data["choices"], list):
                     content = ""
                     if data["choices"]:
                         msg = data["choices"][0].get("message", {})
@@ -145,13 +146,13 @@ def call_llm_turn(
             last_error = exc
             continue
 
-    if last_error:
+    if last_error is not None:
         raise last_error
     raise RuntimeError(f"Failed to query LLM endpoint at {base}")
 
 
 def execute_tool(name: str, args: dict[str, Any], workspace_dir: Path) -> str:
-    """Execute tool call in the isolated workspace."""
+    """Execute a single tool call inside ``workspace_dir``."""
     name = name.strip().lower()
     if name in ("execute_bash", "bash", "shell", "run_command"):
         cmd = args.get("command") or args.get("cmd") or ""
@@ -172,10 +173,10 @@ def execute_tool(name: str, args: dict[str, Any], workspace_dir: Path) -> str:
             return out.strip() or f"Command executed with exit code {proc.returncode}"
         except subprocess.TimeoutExpired:
             return "Error: command timed out after 45s"
-        except Exception as e:
-            return f"Error executing bash: {e}"
+        except Exception as exc:
+            return f"Error executing bash: {exc}"
 
-    elif name in ("write_file", "write", "create_file", "save_file"):
+    if name in ("write_file", "write", "create_file", "save_file"):
         path_str = args.get("path") or args.get("filePath") or args.get("file") or ""
         content = args.get("content") or args.get("code") or ""
         if not path_str:
@@ -185,10 +186,10 @@ def execute_tool(name: str, args: dict[str, Any], workspace_dir: Path) -> str:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
             return f"File {path_str} wrote successfully ({len(content)} bytes)."
-        except Exception as e:
-            return f"Error writing file: {e}"
+        except Exception as exc:
+            return f"Error writing file: {exc}"
 
-    elif name in ("read_file", "read", "view_file", "cat"):
+    if name in ("read_file", "read", "view_file", "cat"):
         path_str = args.get("path") or args.get("filePath") or args.get("file") or ""
         if not path_str:
             return "Error: no path provided"
@@ -197,18 +198,21 @@ def execute_tool(name: str, args: dict[str, Any], workspace_dir: Path) -> str:
             if not target.exists():
                 return f"Error: file {path_str} not found"
             return target.read_text()
-        except Exception as e:
-            return f"Error reading file: {e}"
+        except Exception as exc:
+            return f"Error reading file: {exc}"
 
     return f"Unknown tool: {name}"
 
 
 def parse_tool_calls(text: str) -> list[tuple[str, dict[str, Any]]]:
     """Parse tool calls from XML tags or markdown code fences."""
-    calls = []
+    calls: list[tuple[str, dict[str, Any]]] = []
 
-    # XML tags: <tool_call><name>...</name><args>...</args></tool_call>
-    xml_matches = re.findall(r"<tool_call>\s*<name>(.*?)</name>\s*<args>(.*?)</args>\s*</tool_call>", text, re.DOTALL)
+    xml_matches = re.findall(
+        r"<tool_call>\s*<name>(.*?)</name>\s*<args>(.*?)</args>\s*</tool_call>",
+        text,
+        re.DOTALL,
+    )
     for name, args_raw in xml_matches:
         try:
             args_obj = json.loads(args_raw.strip())
@@ -216,7 +220,6 @@ def parse_tool_calls(text: str) -> list[tuple[str, dict[str, Any]]]:
         except Exception:
             calls.append((name.strip(), {"command": args_raw.strip()}))
 
-    # Fallback to markdown bash blocks if no explicit XML tool call was found
     if not calls:
         bash_blocks = re.findall(r"```(?:bash|sh)\s*([\s\S]*?)```", text)
         for block in bash_blocks:
@@ -235,7 +238,12 @@ def run_agent_loop(
     workspace_dir: Path,
     max_turns: int = 8,
 ) -> tuple[str, int, int, int]:
-    """Run iterative ReAct agent loop, returning (final_output, tokens_in, tokens_out, tool_calls_count)."""
+    """Run iterative ReAct agent loop.
+
+    Returns ``(final_output, tokens_in, tokens_out, tool_calls_count)``.
+    Loops until the model emits ``<task_complete>`` or ``max_turns`` is
+    reached, whichever comes first.
+    """
     messages: list[dict[str, str]] = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
@@ -257,7 +265,7 @@ def run_agent_loop(
             break
 
         messages.append({"role": "assistant", "content": turn_text})
-        observations = []
+        observations: list[str] = []
 
         for name, args in tool_calls:
             total_tool_calls += 1
@@ -275,75 +283,42 @@ def run_agent_loop(
     return final_output, total_tokens_in, total_tokens_out, total_tool_calls
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Autonomous Multi-Turn Agent Engine")
-    parser.add_argument("-p", "--print", "--prompt", dest="prompt", help="Task prompt")
-    parser.add_argument("pos_prompt", nargs="*", help="Positional task prompt")
-    parser.add_argument("--model", default="", help="Model name")
-    parser.add_argument("--output-format", default="text", choices=["text", "json", "stream-json"])
-    parser.add_argument("--dangerously-skip-permissions", action="store_true")
-    parser.add_argument("--auto", action="store_true")
-    parser.add_argument("--yolo", action="store_true")
-    parser.add_argument("extra_args", nargs="*", help="Extra arguments")
+def run_agent_loop_timed(
+    api_base: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    workspace_dir: Path,
+    max_turns: int = 8,
+) -> dict[str, Any]:
+    """Wrap :func:`run_agent_loop` with timing + structured dict return.
 
-    args, unknown = parser.parse_known_args()
-
-    prompt = args.prompt
-    if not prompt and args.pos_prompt:
-        prompt = " ".join(args.pos_prompt)
-    if not prompt and unknown:
-        prompt = " ".join([u for u in unknown if not u.startswith("-")])
-
-    if not prompt:
-        print("Usage: agent_engine.py -p <prompt>", file=sys.stderr)
-        sys.exit(1)
-
-    api_base = (
-        os.environ.get("LLM_API") or os.environ.get("ANTIGRAVITY_API_BASE") or os.environ.get("OPENAI_BASE") or ""
+    Used by the ``AgentEngineAdapter`` so we don't reinvent timing
+    bookkeeping inside the adapter class.
+    """
+    start = time.monotonic()
+    final_output, tokens_in, tokens_out, tool_calls_count = run_agent_loop(
+        api_base,
+        api_key,
+        model,
+        prompt,
+        workspace_dir,
+        max_turns=max_turns,
     )
-    api_key = (
-        os.environ.get("LLM_KEY") or os.environ.get("ANTIGRAVITY_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-    )
-    model = (
-        args.model
-        or os.environ.get("LLM_MODEL")
-        or os.environ.get("ANTIGRAVITY_MODEL")
-        or os.environ.get("OPENAI_MODEL")
-        or ""
-    )
-
-    start_time = time.monotonic()
-    workspace_dir = Path.cwd()
-
-    if api_base and api_key:
-        try:
-            content, tokens_in, tokens_out, tool_calls = run_agent_loop(api_base, api_key, model, prompt, workspace_dir)
-        except Exception as exc:
-            content = f"Error in agent execution: {exc}"
-            tokens_in, tokens_out, tool_calls = 0, 0, 0
-    else:
-        content = f"Agent completed prompt: {prompt}"
-        tokens_in, tokens_out, tool_calls = 100, 20, 0
-
-    duration = time.monotonic() - start_time
-
-    if args.output_format in ("json", "stream-json"):
-        out_obj = {
-            "type": "result",
-            "subtype": "success",
-            "model": model,
-            "duration_ms": int(duration * 1000),
-            "result": content,
-            "tool_calls": tool_calls,
-            "usage": {
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-            },
-        }
-        print(json.dumps(out_obj))
-    else:
-        print(content)
+    return {
+        "final_output": final_output,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "tool_calls_count": tool_calls_count,
+        "duration_seconds": time.monotonic() - start,
+    }
 
 
-if __name__ == "__main__":
-    main()
+__all__ = [
+    "AGENT_SYSTEM_PROMPT",
+    "call_llm_turn",
+    "execute_tool",
+    "parse_tool_calls",
+    "run_agent_loop",
+    "run_agent_loop_timed",
+]

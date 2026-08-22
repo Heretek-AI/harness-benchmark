@@ -54,6 +54,9 @@ class RunConfig:
     output_format: str = "json"
     output_dir: Path = field(default_factory=lambda: Path("runs"))
     extra_env: dict[str, str] = field(default_factory=dict)
+    lsp_enabled: bool = False
+    skills_plugin: str = "caveman"
+    mcp_for_ablation: str = "repomix"
 
 
 @dataclass
@@ -124,7 +127,14 @@ class BenchmarkRunner:
         bench_logger.banner(f"Harness Benchmark 2.0: {self.config.name}")
         for harness, benchmark, plugins, mcp_servers in cells:
             bench_logger.cell_start(harness, benchmark, plugins, mcp_servers, self.config.tasks_limit or 0)
-            cell_results = self._run_cell(harness, benchmark, plugins, mcp_servers, run_dir)
+            cell_results = self._run_cell(
+                harness,
+                benchmark,
+                plugins,
+                mcp_servers,
+                run_dir,
+                lsp_enabled=self.config.lsp_enabled,
+            )
             report.results.extend(cell_results)
             self.metric_collector.reset()
             for r in cell_results:
@@ -152,6 +162,7 @@ class BenchmarkRunner:
         plugins: list[str],
         mcp_servers: list[str],
         run_dir: Path,
+        lsp_enabled: bool = False,
     ) -> list[ExecutionResult]:
         if harness_name not in ADAPTERS:
             logger.warning("unknown harness %r; skipping cell", harness_name)
@@ -173,6 +184,10 @@ class BenchmarkRunner:
             **self.config.extra_env,
         }
 
+        # Local import avoids a circular dependency with the evaluation
+        # package during package init.
+        from evaluation.lsp_feedback import run_lsp_iteration_loop
+
         results: list[ExecutionResult] = []
         try:
             ctx = adapter.setup(
@@ -191,11 +206,20 @@ class BenchmarkRunner:
                     cwd.mkdir(parents=True, exist_ok=True)
                 benchmark.pre_setup(cwd)
                 bench_logger.task_start(task.task_id, task.prompt)
-                result = adapter.execute_task(task.prompt, cwd, timeout=self.config.timeout_seconds)
+                result, lsp_diags = run_lsp_iteration_loop(
+                    adapter=adapter,
+                    prompt=task.prompt,
+                    workspace_dir=cwd,
+                    timeout=self.config.timeout_seconds,
+                    lsp_enabled=lsp_enabled,
+                )
                 result.benchmark = benchmark_name
                 result.task_id = task.task_id
                 result.plugins = list(plugins)
                 result.mcp_servers = list(mcp_servers)
+                result.lsp_enabled = bool(lsp_enabled)
+                if lsp_diags:
+                    result.lsp_diagnostics = list(lsp_diags)
                 result.passed = benchmark.grade(result, task.expected, cwd=cwd)
                 if (
                     result.tokens_input is not None or result.tokens_output is not None

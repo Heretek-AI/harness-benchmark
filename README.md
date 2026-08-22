@@ -7,7 +7,31 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-A production-grade, matrix-based automated benchmark framework and turnkey GitHub Action for evaluating **AI Coding Harnesses** (`claude-code`, `opencode`, `DeepSeek-Reasonix`, `gemini-cli`, `antigravity-cli`, `deepseek-harness`), **Model Context Protocol (MCP) Servers** (`chrome-devtools-mcp`, `codebase-memory-mcp`, `context7`, `repomix`), **Language Server Protocol (LSP) Diagnostics**, and **Agent Plugins** across standardized benchmarks ([`coder_eval`](https://github.com/UiPath/coder_eval) with isolated unit tests, `terminal-bench` with deterministic shell verifications) under controlled LLM configurations (`LLM_API`, `LLM_KEY`, `LLM_MODEL`).
+A production-grade, matrix-based automated benchmark framework and turnkey GitHub Action for evaluating **AI Coding Harnesses** (`claude-code`, `opencode`, `DeepSeek-Reasonix`, `gemini-cli`, `antigravity-cli`, `deepseek-harness`, in-process `agent-engine`), **Model Context Protocol (MCP) Servers** (`chrome-devtools-mcp`, `codebase-memory-mcp`, `context7`, `repomix`), **Language Server Protocol (LSP) Diagnostics**, and **Agent Plugins** across standardized benchmarks ([`coder_eval`](https://github.com/UiPath/coder_eval) with isolated unit tests, `terminal-bench` with deterministic shell verifications) under controlled LLM configurations (`LLM_API`, `LLM_KEY`, `LLM_MODEL`).
+
+---
+
+## ⚙️ Prerequisites
+
+The `plugins/registry.json` and `mcp/mcp_registry.json` catalogs reference source paths under a `review/` workspace (gitignored). Clone the upstream repos into `review/` before running non-trivial matrix sweeps so the plugin loader and MCP launcher can stage real source material:
+
+```bash
+mkdir -p review/claude-plugins review/mcp
+# Example: clone the upstream Claude plugins referenced by plugins/registry.json
+git clone https://github.com/<upstream>/caveman        review/claude-plugins/caveman
+git clone https://github.com/<upstream>/claude-mem     review/claude-plugins/claude-mem
+git clone https://github.com/<upstream>/ECC           review/claude-plugins/ECC
+git clone https://github.com/<upstream>/graphify       review/claude-plugins/graphify
+git clone https://github.com/<upstream>/headroom       review/claude-plugins/headroom
+git clone https://github.com/<upstream>/ponytail       review/claude-plugins/ponytail
+git clone https://github.com/<upstream>/rtk            review/claude-plugins/rtk
+git clone https://github.com/<upstream>/Understand-Anything review/claude-plugins/Understand-Anything
+
+# MCP servers are launched via npx/uvx at runtime; no clone is required for those,
+# but their `source_path` entries are only used for diff/review purposes.
+```
+
+The smoke preset (`--preset smoke_test`) and the `stub` / `agent-engine` harnesses do **not** require the `review/` workspace.
 
 ---
 
@@ -64,6 +88,17 @@ jobs:
 
 ## 🔬 5-Tier Ablation Proof Matrix
 
+> **Illustrative example** — these numbers represent a representative pass-rate profile and demonstrate report formatting. They are *not* measured outputs of this repo. To reproduce empirically, run:
+>
+> ```bash
+> python run_benchmark.py --ablation \
+>     --harness claude-code --benchmark coder_eval \
+>     --tasks-limit 5 --output-format markdown \
+>     --output-dir runs/ablation
+> ```
+>
+> Requires `LLM_API`, `LLM_KEY`, `LLM_MODEL` env vars and a reachable LLM endpoint. The runner emits a `MultiTierAblationReport` and prints the rendered `5-Tier Ablation Proof Matrix` to stdout. Substitute the measured values back into this table after each release.
+
 Empirically proves the ROI of augmenting raw baseline models with LSP, Skills, and MCP tools:
 
 | Ablation Tier | Description | Pass@1 | Δ Pass Rate | Tokens / Task | Δ Token Cost | Latency p50 | Avg Turns |
@@ -77,6 +112,8 @@ Empirically proves the ROI of augmenting raw baseline models with LSP, Skills, a
 ---
 
 ## 📊 Live Multi-Harness Benchmark Results
+
+> **Illustrative example** — placeholder for measured pass-rates, latency, and token counts. Populate by running the full matrix sweep with real LLM credentials and substituting the values into this table.
 
 Live results evaluated across tasks under uniform LLM configuration (`MiniMax-M3`):
 

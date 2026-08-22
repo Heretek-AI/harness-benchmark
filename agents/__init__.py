@@ -6,10 +6,10 @@ The runner resolves ``harness`` CLI args against ``ADAPTERS``.
 
 from __future__ import annotations
 
+# Real adapters (filled in below).
+from agents.agent_engine_adapter import AgentEngineAdapter
 from agents.antigravity_adapter import AntigravityAdapter
 from agents.base import BaseAgentAdapter, ExecutionResult
-
-# Real adapters (filled in below).
 from agents.claude_code_adapter import ClaudeCodeAdapter
 from agents.deepseek_harness_adapter import DeepSeekHarnessAdapter, DeepSeekReasonixAdapter
 from agents.gemini_cli_adapter import GeminiCLIAdapter
@@ -23,6 +23,7 @@ ADAPTERS: dict[str, type[BaseAgentAdapter]] = {
     "DeepSeek-Reasonix": DeepSeekReasonixAdapter,
     "gemini-cli": GeminiCLIAdapter,
     "opencode": OpenCodeAdapter,
+    "agent-engine": AgentEngineAdapter,  # in-process ReAct loop; always available
     "stub": StubAdapter,  # for smoke tests; not part of the real matrix
 }
 
@@ -42,6 +43,7 @@ def resolve(name: str) -> BaseAgentAdapter:
 __all__ = [
     "ADAPTERS",
     "AdapterContext",
+    "AgentEngineAdapter",
     "AntigravityAdapter",
     "BaseAgentAdapter",
     "ClaudeCodeAdapter",

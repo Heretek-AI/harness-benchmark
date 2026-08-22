@@ -175,6 +175,50 @@ class BaseAgentAdapter(abc.ABC):
         non-default behaviour (e.g., Claude Code parses ``--verbose`` JSONL
         after the subprocess completes).
         """
+        return self._execute_with_engine_fallback(prompt, workspace_dir, timeout)
+
+    def _should_fallback_to_engine(self) -> bool:
+        """True when this adapter's CLI is missing AND fallback is enabled.
+
+        The fallback transport is opt-in via ``HARNESS_BENCH_FALLBACK_ENGINE=1``
+        so existing behaviour (hard-fail on missing CLI) is preserved by
+        default. Adapters that are themselves always-available
+        (``agent-engine``, ``stub``) never return True.
+        """
+        from agents.agent_engine_adapter import fallback_env_enabled
+
+        if self.name in ("agent-engine", "stub"):
+            return False
+        if not fallback_env_enabled():
+            return False
+        try:
+            cli = self.resolve_cli()
+        except Exception:
+            cli = None
+        return cli is None
+
+    def _execute_with_engine_fallback(
+        self,
+        prompt: str,
+        workspace_dir: Path,
+        timeout: int,
+    ) -> ExecutionResult:
+        """Run via the CLI; if the CLI is missing and fallback is enabled,
+        delegate to ``agents.agent_engine`` instead of failing.
+        """
+        if self._should_fallback_to_engine():
+            from agents.agent_engine_adapter import AgentEngineAdapter
+
+            api_base, api_key, model = self.get_llm_config()
+            logger.info("%s: CLI not on PATH; falling back to agent-engine", self.name)
+            return AgentEngineAdapter.fallback_run(
+                prompt=prompt,
+                workspace_dir=workspace_dir,
+                api_base=api_base,
+                api_key=api_key,
+                model=model,
+                timeout=timeout,
+            )
         return self._run_cli(self._build_command(prompt, workspace_dir), workspace_dir, timeout)
 
     def _run_cli(
@@ -192,9 +236,10 @@ class BaseAgentAdapter(abc.ABC):
         start = time.monotonic()
         plugins = list(self.ctx.plugins) if self._ctx else []
         mcp_servers = list(self.ctx.mcp_servers) if self._ctx else []
+        wrapped_cmd = self._wrap_with_bwrap(cmd, workspace_dir)
         try:
             proc = subprocess.run(
-                cmd,
+                wrapped_cmd,
                 cwd=str(workspace_dir),
                 env=self.full_env(),
                 capture_output=True,
@@ -234,6 +279,44 @@ class BaseAgentAdapter(abc.ABC):
             ),
             tool_calls=tool_calls,
         )
+
+    def _wrap_with_bwrap(
+        self,
+        cmd: list[str],
+        workspace_dir: Path,
+    ) -> list[str]:
+        """Optionally wrap ``cmd`` in a bubblewrap sandbox.
+
+        Opt-in via ``HARNESS_BENCH_USE_BWRAP=1``; defaults to returning
+        ``cmd`` unchanged so existing behaviour is preserved. When the
+        toggle is on but ``bwrap`` is missing on PATH we log a debug
+        message and pass through.
+        """
+        if not os.environ.get("HARNESS_BENCH_USE_BWRAP"):
+            return cmd
+        bwrap = shutil.which("bwrap")
+        if bwrap is None:
+            logger.debug("bwrap not on PATH; running %s without sandbox", cmd[0] if cmd else "<empty>")
+            return cmd
+        return [
+            bwrap,
+            "--ro-bind",
+            "/",
+            "/",
+            "--bind",
+            str(workspace_dir),
+            str(workspace_dir),
+            "--tmpfs",
+            "/tmp",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--unshare-pid",
+            "--die-with-parent",
+            "--",
+            *cmd,
+        ]
 
     def _materialize_tool_artifacts(self, stdout: str, workspace_dir: Path) -> None:
         """Execute filesystem and shell actions emitted in structured tags if any."""

@@ -36,9 +36,11 @@ When designing evaluation matrices, always consider the 5 standard ablation tier
 
 ---
 
-## 3. Engineering Conventions & Standards
+## 2.5 Prerequisites — the `review/` workspace
 
-### Type Safety & Validation
+The plugin and MCP catalogs (`plugins/registry.json`, `mcp/mcp_registry.json`) reference source paths under a gitignored `review/` workspace. Clone the upstream repos into `review/` before running matrix sweeps that load real plugins/MCPs. The `smoke_test` preset and `stub` / `agent-engine` harnesses do **not** require this workspace. Example clone commands live in the README's `## ⚙️ Prerequisites` section.
+
+## 3. Engineering Conventions & Standards
 - Use Python 3.11+ type hints (`from __future__ import annotations`).
 - Use `pydantic.BaseModel` for data contracts that serialize to/from JSON artifacts (`ExecutionResult`, `TaskSpec`, `MetricSummary`, `ABComparisonResult`, `MultiTierAblationReport`).
 - Ensure all public functions and methods include descriptive docstrings and precise type signatures.

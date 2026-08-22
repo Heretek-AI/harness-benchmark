@@ -119,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Strict floor (0.0 - 1.0) for cell pass-rate. Fails with exit code 1 if below floor.",
     )
     parser.add_argument("--ab-test", action="store_true", help="Enable A/B comparative evaluation")
+    parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help="Run the deterministic 5-tier ablation matrix (overrides preset; uses harness + benchmark only)",
+    )
     parser.add_argument("--scorecard", action="store_true", help="Render human-centric model scorecard")
     parser.add_argument("--publish-issue", action="store_true", help="Publish report to date-labeled GitHub issue")
     parser.add_argument("--name", default=None, help="Run name; becomes the run-id prefix.")
@@ -182,6 +187,29 @@ def main(argv: list[str] | None = None) -> int:
         bench_logger.debug_mode = True
 
     runner = BenchmarkRunner(config, plugin_loader, mcp_launcher)
+
+    # Ablation runner is a thin layer over BenchmarkRunner._run_cell; it
+    # overrides (plugins, mcp_servers, lsp_enabled) per cell and emits a
+    # MultiTierAblationReport on top of the standard RunReport.
+    ablation_result = None
+    if args.ablation:
+        from evaluation.ablation_runner import AblationRunner
+
+        if len(harness) != 1 or len(benchmark) != 1:
+            print(
+                "::error::--ablation requires exactly one --harness and one --benchmark",
+                file=sys.stderr,
+            )
+            return 1
+        ablation = AblationRunner(
+            harness_name=harness[0],
+            benchmark_name=benchmark[0],
+            benchmark_runner=runner,
+            skills_plugin=(plugins[0] if plugins and plugins[0] not in (None, "", "none", "all") else "caveman"),
+            mcp_for_ablation=(mcp[0] if mcp and mcp[0] not in (None, "", "none", "all") else "repomix"),
+        )
+        ablation_result = ablation.run()
+
     report = runner.run()
 
     if args.junit_xml:
@@ -248,6 +276,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::notice::Published benchmark report to GitHub Issue: {issue_url}")
         else:
             print("::warning::Could not publish GitHub Issue (check gh auth status)")
+
+    if ablation_result is not None and ablation_result.report is not None:
+        from evaluation.ablation import AblationEngine
+
+        print()
+        print(AblationEngine.render_ablation_markdown(ablation_result.report))
 
     if args.minimum_task_score is not None:
         floor = float(args.minimum_task_score)

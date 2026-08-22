@@ -76,6 +76,9 @@ class ExecutionResult(BaseModel):
     tier: str | None = None
     plugins: list[str] = Field(default_factory=list)
     mcp_servers: list[str] = Field(default_factory=list)
+    plugins_loaded: list[str] = Field(default_factory=list)
+    mcp_loaded: list[str] = Field(default_factory=list)
+    lsp_enabled: bool = False
     exit_code: int
     duration_seconds: float
     stdout: str = ""

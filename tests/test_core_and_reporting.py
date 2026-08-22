@@ -14,9 +14,9 @@ from core.types import (
     ToolCall,
 )
 from evaluation.oracle import OracleEvaluator
+from metrics.junit_exporter import export_junit_xml
 from reporting.ab_comparator import ABComparator
 from reporting.github_issue import GitHubIssuePublisher
-from reporting.junit import JUnitExporter
 from reporting.scorecard import ScorecardGenerator
 
 
@@ -200,6 +200,6 @@ def test_scorecard_and_github_issue_publishing(tmp_path: Path) -> None:
     assert "MiniMax-M3" in body
 
     junit_file = tmp_path / "junit.xml"
-    JUnitExporter.export(report, junit_file)
+    export_junit_xml(report.results, junit_file, suite_name=report.run_id)
     assert junit_file.exists()
     assert '<testcase name="ce-py-001"' in junit_file.read_text()

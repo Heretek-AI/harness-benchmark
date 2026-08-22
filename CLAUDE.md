@@ -46,6 +46,22 @@ The adapter is implemented in [`agents/claude_code_adapter.py`](agents/claude_co
 
 ---
 
+## 2.5 Prerequisites — the `review/` workspace
+
+The plugin and MCP catalogs (`plugins/registry.json`, `mcp/mcp_registry.json`) reference source paths under a gitignored `review/` workspace. Clone the upstream repos into `review/` before running matrix sweeps that load real plugins/MCPs. The `smoke_test` preset and `stub` / `agent-engine` harnesses do **not** require this workspace.
+
+See the README's `## ⚙️ Prerequisites` section for example clone commands.
+
+## 2.6 Environment toggles
+
+| Variable | Effect | Default |
+|---|---|---|
+| `HARNESS_BENCH_FALLBACK_ENGINE` | When `1`, adapters whose CLI is missing on PATH delegate to the in-process `agent-engine` ReAct loop instead of failing. | unset (hard-fail) |
+| `HARNESS_BENCH_USE_BWRAP` | When `1`, every harness subprocess is wrapped in a bubblewrap sandbox (`--ro-bind /` + writable workspace + `--unshare-pid`). Falls back gracefully if `bwrap` is not on PATH. | unset (no sandbox) |
+| `HARNESS_BENCH_MCP_REGISTRY` | Override path to `mcp/mcp_registry.json`. | `mcp/mcp_registry.json` |
+| `HARNESS_BENCH_PLUGIN_REGISTRY` | Override path to `plugins/registry.json`. | `plugins/registry.json` |
+| `HARNESS_BENCH_PRICING_JSON` | Override path to USD token pricing JSON for `metrics.cost_table`. | built-in default |
+
 ## 3. Environment Variables
 
 When running real benchmarks with Claude Code:
