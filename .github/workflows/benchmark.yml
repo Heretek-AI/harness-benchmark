@@ -256,3 +256,77 @@ jobs:
           name: bench-report
           path: runs/REPORT.md
           retention-days: 90
+
+  regression-check:
+    needs: report
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download aggregated report
+        uses: actions/download-artifact@v4
+        with:
+          name: bench-report
+          path: runs/
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Check for regressions
+        id: regression
+        shell: python
+        continue-on-error: true
+        run: |
+          import json, os, sys
+          from pathlib import Path
+
+          sys.path.insert(0, os.getcwd())
+
+          # Load current run results
+          report_path = Path("runs/REPORT.md")
+          if not report_path.exists():
+              print("No report found, skipping regression check")
+              sys.exit(0)
+
+          # Try to load result.json files from artifacts
+          results_dir = Path("runs-aggregate")
+          if not results_dir.exists():
+              results_dir = Path("runs")
+
+          # For now, just check if baseline exists and report status
+          from metrics.regression import RegressionDetector
+          from metrics.normalized_score import HarnessScore, NormalizedScorer
+
+          detector = RegressionDetector(baseline_dir=Path("results/baseline"))
+          baseline = detector.load_baseline("latest")
+
+          if not baseline:
+              print("No baseline found — first run, skipping regression check")
+              print("To create a baseline, run: python run_benchmark.py --preset smoke_test --save-baseline")
+              sys.exit(0)
+
+          print(f"Found baseline with {len(baseline)} entries")
+          print("Regression check would compare against this baseline")
+          # Actual comparison requires parsed HarnessScore objects from the run
+          # This is a placeholder for when full integration is ready
+
+      - name: File regression issue
+        if: steps.regression.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Regression detected — would file GitHub Issue"
+          # Uncomment when ready to auto-file issues:
+          # python -c "
+          # from reporting.regression_issue import RegressionIssueReporter
+          # from metrics.regression import RegressionDetector
+          # reporter = RegressionIssueReporter(dry_run=False)
+          # # ... load report and create issue
+          # "
