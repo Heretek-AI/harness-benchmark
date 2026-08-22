@@ -291,6 +291,10 @@ class BaseAgentAdapter(abc.ABC):
         ``cmd`` unchanged so existing behaviour is preserved. When the
         toggle is on but ``bwrap`` is missing on PATH we log a debug
         message and pass through.
+
+        Environment toggles:
+            ``HARNESS_BENCH_USE_BWRAP=1``       — enable sandbox
+            ``HARNESS_BENCH_NETWORK_ISOLATION=1`` — add ``--unshare-net``
         """
         if not os.environ.get("HARNESS_BENCH_USE_BWRAP"):
             return cmd
@@ -298,7 +302,7 @@ class BaseAgentAdapter(abc.ABC):
         if bwrap is None:
             logger.debug("bwrap not on PATH; running %s without sandbox", cmd[0] if cmd else "<empty>")
             return cmd
-        return [
+        flags = [
             bwrap,
             "--ro-bind",
             "/",
@@ -314,9 +318,10 @@ class BaseAgentAdapter(abc.ABC):
             "/proc",
             "--unshare-pid",
             "--die-with-parent",
-            "--",
-            *cmd,
         ]
+        if os.environ.get("HARNESS_BENCH_NETWORK_ISOLATION"):
+            flags.append("--unshare-net")
+        return [*flags, "--", *cmd]
 
     def _materialize_tool_artifacts(self, stdout: str, workspace_dir: Path) -> None:
         """Execute filesystem and shell actions emitted in structured tags if any."""

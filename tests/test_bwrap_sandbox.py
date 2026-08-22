@@ -64,3 +64,28 @@ def test_wrap_returns_unchanged_for_empty_cmd(tmp_path: Path, monkeypatch: pytes
     # Empty cmd still gets wrapped (the bwrap binary plus sandbox flags
     # followed by "--"). The important property is no crash.
     assert wrapped[0] == "/usr/bin/bwrap"
+
+
+def test_wrap_includes_unshare_net_when_network_isolation_enabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HARNESS_BENCH_USE_BWRAP", "1")
+    monkeypatch.setenv("HARNESS_BENCH_NETWORK_ISOLATION", "1")
+    a = _make_adapter()
+    cmd = ["echo", "hi"]
+    with patch("agents.base.shutil.which", return_value="/usr/bin/bwrap"):
+        wrapped = a._wrap_with_bwrap(cmd, tmp_path)
+    assert "--unshare-net" in wrapped
+    assert wrapped[0] == "/usr/bin/bwrap"
+
+
+def test_wrap_omits_unshare_net_when_network_isolation_disabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HARNESS_BENCH_USE_BWRAP", "1")
+    monkeypatch.delenv("HARNESS_BENCH_NETWORK_ISOLATION", raising=False)
+    a = _make_adapter()
+    cmd = ["echo", "hi"]
+    with patch("agents.base.shutil.which", return_value="/usr/bin/bwrap"):
+        wrapped = a._wrap_with_bwrap(cmd, tmp_path)
+    assert "--unshare-net" not in wrapped
