@@ -9,6 +9,10 @@ import pytest
 from plugins import PluginLoader
 
 
+@pytest.mark.skipif(
+    not Path("review/claude-plugins/caveman").exists(),
+    reason="review/ workspace not cloned (see README Prerequisites)",
+)
 def test_load_known_plugin(plugin_registry_path: Path) -> None:
     loader = PluginLoader(plugin_registry_path)
     spec = loader.load("caveman")
@@ -29,6 +33,10 @@ def test_synthesize_with_none_returns_none(plugin_registry_path: Path) -> None:
     assert out is None
 
 
+@pytest.mark.skipif(
+    not Path("review/claude-plugins/caveman").exists(),
+    reason="review/ workspace not cloned (see README Prerequisites)",
+)
 def test_synthesize_makes_staging_root(plugin_registry_path: Path, tmp_path: Path) -> None:
     loader = PluginLoader(plugin_registry_path)
     staging = loader.synthesize_agent_config("claude-code", ["caveman"], staging_root=tmp_path / "plugins")
