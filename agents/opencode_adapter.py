@@ -49,9 +49,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
                         "baseURL": api_base or "http://localhost:4000/v1",
                         "apiKey": api_key,
                     },
-                    "models": {
-                        target_model: {"name": target_model}
-                    },
+                    "models": {target_model: {"name": target_model}},
                 }
             },
             "mcp_servers": list(mcp_servers),

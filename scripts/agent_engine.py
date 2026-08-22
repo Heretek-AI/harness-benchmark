@@ -126,9 +126,9 @@ def call_llm_turn(
 
                 # Parse Anthropic shape
                 if "content" in data and isinstance(data["content"], list):
-                    content = "".join([
-                        b.get("text", "") for b in data["content"] if isinstance(b, dict) and b.get("type") == "text"
-                    ])
+                    content = "".join(
+                        [b.get("text", "") for b in data["content"] if isinstance(b, dict) and b.get("type") == "text"]
+                    )
                     usage = data.get("usage", {})
                     return content, usage.get("input_tokens", 0), usage.get("output_tokens", 0)
 
@@ -246,7 +246,7 @@ def run_agent_loop(
     total_tool_calls = 0
     final_output = ""
 
-    for turn in range(max_turns):
+    for _turn in range(max_turns):
         turn_text, t_in, t_out = call_llm_turn(api_base, api_key, model, messages)
         total_tokens_in += t_in
         total_tokens_out += t_out
@@ -265,10 +265,12 @@ def run_agent_loop(
             observations.append(f"Observation for {name}:\n{obs}")
 
         obs_content = "\n\n".join(observations)
-        messages.append({
-            "role": "user",
-            "content": f"{obs_content}\n\nProceed to solve the task or output <task_complete>.",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": f"{obs_content}\n\nProceed to solve the task or output <task_complete>.",
+            }
+        )
 
     return final_output, total_tokens_in, total_tokens_out, total_tool_calls
 
@@ -296,18 +298,26 @@ def main() -> None:
         print("Usage: agent_engine.py -p <prompt>", file=sys.stderr)
         sys.exit(1)
 
-    api_base = os.environ.get("LLM_API") or os.environ.get("ANTIGRAVITY_API_BASE") or os.environ.get("OPENAI_BASE") or ""
-    api_key = os.environ.get("LLM_KEY") or os.environ.get("ANTIGRAVITY_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-    model = args.model or os.environ.get("LLM_MODEL") or os.environ.get("ANTIGRAVITY_MODEL") or os.environ.get("OPENAI_MODEL") or ""
+    api_base = (
+        os.environ.get("LLM_API") or os.environ.get("ANTIGRAVITY_API_BASE") or os.environ.get("OPENAI_BASE") or ""
+    )
+    api_key = (
+        os.environ.get("LLM_KEY") or os.environ.get("ANTIGRAVITY_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+    )
+    model = (
+        args.model
+        or os.environ.get("LLM_MODEL")
+        or os.environ.get("ANTIGRAVITY_MODEL")
+        or os.environ.get("OPENAI_MODEL")
+        or ""
+    )
 
     start_time = time.monotonic()
     workspace_dir = Path.cwd()
 
     if api_base and api_key:
         try:
-            content, tokens_in, tokens_out, tool_calls = run_agent_loop(
-                api_base, api_key, model, prompt, workspace_dir
-            )
+            content, tokens_in, tokens_out, tool_calls = run_agent_loop(api_base, api_key, model, prompt, workspace_dir)
         except Exception as exc:
             content = f"Error in agent execution: {exc}"
             tokens_in, tokens_out, tool_calls = 0, 0, 0

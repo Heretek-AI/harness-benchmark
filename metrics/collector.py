@@ -48,9 +48,7 @@ class MetricCollector:
                 "tool_calls_by_name": {},
             }
         scored = [r for r in rows if r.passed is not None]
-        pass_rate = (
-            sum(1 for r in scored if r.passed) / len(scored) if scored else None
-        )
+        pass_rate = sum(1 for r in scored if r.passed) / len(scored) if scored else None
         latencies = sorted(r.duration_seconds for r in rows)
         p50 = latencies[int(len(latencies) * 0.5)]
         p95 = latencies[min(int(len(latencies) * 0.95), len(latencies) - 1)]

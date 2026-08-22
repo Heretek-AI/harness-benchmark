@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-from agents.claude_code_adapter import ClaudeCodeAdapter, _build_mcp_config
+from agents.claude_code_adapter import ClaudeCodeAdapter
 
 
 def test_claude_code_token_extraction() -> None:

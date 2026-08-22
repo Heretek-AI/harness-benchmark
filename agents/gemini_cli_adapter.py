@@ -104,14 +104,8 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             for name in mcp_servers:
                 registry_path = os.environ.get("HARNESS_BENCH_MCP_REGISTRY")
                 if registry_path is None:
-                    candidate = (
-                        _P(__file__).resolve().parents[1]
-                        / "mcp"
-                        / "mcp_registry.json"
-                    )
-                    registry_path = (
-                        str(candidate) if candidate.exists() else None
-                    )
+                    candidate = _P(__file__).resolve().parents[1] / "mcp" / "mcp_registry.json"
+                    registry_path = str(candidate) if candidate.exists() else None
                 if registry_path is None:
                     raise RuntimeError("MCP registry not found")
                 registry = json.loads(_P(registry_path).read_text())
@@ -121,9 +115,7 @@ class GeminiCLIAdapter(BaseAgentAdapter):
                     "args": spec.get("args", []),
                     "env": spec.get("env", {}),
                 }
-            (ctx.workspace_dir / "gemini-extension.json").write_text(
-                json.dumps(ext, indent=2)
-            )
+            (ctx.workspace_dir / "gemini-extension.json").write_text(json.dumps(ext, indent=2))
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
         return [self.cli_binary, "-p", prompt, "--output-format", "json"]

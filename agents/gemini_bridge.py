@@ -12,8 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
-import sys
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -40,19 +38,21 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         content_length = int(self.headers.get("Content-Length", 0))
         req_body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else "{}"
-        
+
         try:
             gemini_req = json.loads(req_body)
         except Exception:
             gemini_req = {}
 
         target_model = os.environ.get("LLM_MODEL") or "MiniMax-M3"
-        api_base = (os.environ.get("LLM_API") or os.environ.get("OPENAI_BASE") or "https://llm.heretek.one/v1").rstrip("/")
+        api_base = (os.environ.get("LLM_API") or os.environ.get("OPENAI_BASE") or "https://llm.heretek.one/v1").rstrip(
+            "/"
+        )
         api_key = os.environ.get("LLM_KEY") or os.environ.get("OPENAI_API_KEY") or ""
 
         # Convert Gemini contents to OpenAI/Anthropic messages
         messages = []
-        
+
         # System instruction
         system_instr = gemini_req.get("systemInstruction", {})
         if system_instr and isinstance(system_instr, dict):
@@ -85,7 +85,7 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
 
         # Prepare upstream request
         is_sse = "alt=sse" in self.path or ":streamGenerateContent" in self.path
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -132,7 +132,7 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=20) as resp:
                     raw = resp.read().decode("utf-8")
                     data = json.loads(raw)
-                    
+
                     # Parse Anthropic format
                     if "content" in data and isinstance(data["content"], list):
                         for b in data["content"]:
@@ -184,7 +184,7 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "close")
             self.end_headers()
-            
+
             chunk = f"data: {json.dumps(gemini_resp)}\n\n"
             self.wfile.write(chunk.encode("utf-8"))
             self.wfile.flush()

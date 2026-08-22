@@ -37,10 +37,12 @@ python run_benchmark.py \
   Executes `antigravity run <prompt>` inside the isolated task directory with merged environment variables.
 
 ### Gemini CLI Adapter ([`agents/gemini_cli_adapter.py`](agents/gemini_cli_adapter.py))
+- **REST Translation Bridge**:
+  Automatically spawns a local translation bridge ([`agents/gemini_bridge.py`](agents/gemini_bridge.py)) on localhost translating Gemini SDK requests to the target `LLM_API` endpoint with clean SSE stream termination.
 - **MCP Extension Synthesis**:
   Generates `gemini-extension.json` containing registered MCP server definitions (`command`, `args`, `env`).
-- **CLI Invocation**:
-  Executes `gemini run <prompt>`.
+- **Headless Invocation & Tool Materialization**:
+  Executes `gemini -p <prompt> --output-format json` with non-interactive flags (`CI=1`, `NO_COLOR=1`, `GEMINI_CLI_TRUST_WORKSPACE=true`) and automatically materializes emitted file and shell actions in the hermetic workspace.
 
 ---
 

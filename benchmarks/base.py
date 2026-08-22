@@ -19,8 +19,9 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from agents.base import ExecutionResult
 from pydantic import BaseModel
+
+from agents.base import ExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ class BaseBenchmark(abc.ABC):
     def grade(self, result: ExecutionResult, expected: Any) -> bool:
         """Return True if the harness output satisfies the task."""
 
-    def pre_setup(self, workspace_dir: Path) -> None:
+    def pre_setup(self, workspace_dir: Path) -> None:  # noqa: B027
         """Hook: copy dataset fixtures into ``workspace_dir`` before run."""
+        pass
 
 
 class JSONManifestBenchmark(BaseBenchmark):

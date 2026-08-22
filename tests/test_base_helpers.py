@@ -11,10 +11,8 @@ These lock in the contract that:
 
 from __future__ import annotations
 
-from pathlib import Path
 import json
-
-import pytest
+from pathlib import Path
 
 from agents import (
     AntigravityAdapter,
@@ -25,7 +23,6 @@ from agents import (
     StubAdapter,
 )
 from benchmarks import CoderEvalAdapter, JSONManifestBenchmark, TaskSpec
-
 
 # ---- adapter command shape ----
 
@@ -101,8 +98,7 @@ def test_run_cli_records_file_not_found(tmp_path: Path) -> None:
 
 def test_json_manifest_loads_when_present(tmp_path: Path) -> None:
     (tmp_path / "tasks.json").write_text(
-        '[{"task_id": "t1", "prompt": "p1", "expected": {"x": 1}}, '
-        '{"task_id": "t2", "prompt": "p2"}]'
+        '[{"task_id": "t1", "prompt": "p1", "expected": {"x": 1}}, {"task_id": "t2", "prompt": "p2"}]'
     )
 
     class _T(JSONManifestBenchmark):
@@ -147,7 +143,7 @@ def test_base_grade_default_falls_back_to_exit_code(tmp_path: Path) -> None:
     """When ``expected`` is None, ``grade`` returns True iff exit_code == 0."""
 
     from agents.base import ExecutionResult
-    from benchmarks.base import JSONManifestBenchmark, TaskSpec
+    from benchmarks.base import JSONManifestBenchmark
 
     class _T(JSONManifestBenchmark):
         name = "tmp-test"
@@ -168,7 +164,7 @@ def test_base_grade_expected_default_requires_nonzero_expected(tmp_path: Path) -
     when exit_code == 0; failing harness with expected set = fail."""
 
     from agents.base import ExecutionResult
-    from benchmarks.base import JSONManifestBenchmark, TaskSpec
+    from benchmarks.base import JSONManifestBenchmark
 
     class _T(JSONManifestBenchmark):
         name = "tmp-test"
@@ -186,21 +182,23 @@ def test_base_grade_expected_default_requires_nonzero_expected(tmp_path: Path) -
 
 def test_extract_token_usage_gemini_cli_stats() -> None:
     adapter = GeminiCLIAdapter()
-    sample_stdout = json.dumps({
-        "session_id": "test-123",
-        "response": "Hello world",
-        "stats": {
-            "models": {
-                "gemini-2.5-pro": {
-                    "tokens": {
-                        "prompt": 500,
-                        "candidates": 120,
-                        "total": 620,
+    sample_stdout = json.dumps(
+        {
+            "session_id": "test-123",
+            "response": "Hello world",
+            "stats": {
+                "models": {
+                    "gemini-2.5-pro": {
+                        "tokens": {
+                            "prompt": 500,
+                            "candidates": 120,
+                            "total": 620,
+                        }
                     }
                 }
-            }
+            },
         }
-    })
+    )
     inp, out = adapter.extract_token_usage(sample_stdout)
     assert inp == 500
     assert out == 120

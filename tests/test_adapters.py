@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from agents import (
-    ADAPTERS,
     AntigravityAdapter,
     ClaudeCodeAdapter,
     DeepSeekHarnessAdapter,
@@ -109,17 +108,23 @@ def test_gemini_adapter_setup_with_mcp(tmp_path: Path, mcp_registry_path: Path) 
         ext = json.loads(ext_path.read_text())
         assert "repomix" in ext["mcpServers"]
         assert ctx.extra_env["GEMINI_API_KEY"] == "gemini-secret-token"
-        assert ctx.extra_env["GEMINI_API_BASE"].startswith("http://127.0.0.1:") or ctx.extra_env["GEMINI_API_BASE"] == "https://custom.gemini.proxy"
+        assert (
+            ctx.extra_env["GEMINI_API_BASE"].startswith("http://127.0.0.1:")
+            or ctx.extra_env["GEMINI_API_BASE"] == "https://custom.gemini.proxy"
+        )
     finally:
         adapter.teardown()
 
 
 def test_gemini_bridge_sse_clean_termination() -> None:
+    import io
     import socket
     import threading
     import time
     import urllib.request
     from http.server import HTTPServer
+    from unittest.mock import patch
+
     from agents.gemini_bridge import GeminiBridgeHandler
 
     s = socket.socket()
@@ -130,19 +135,33 @@ def test_gemini_bridge_sse_clean_termination() -> None:
     server = HTTPServer(("127.0.0.1", port), GeminiBridgeHandler)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
+
+    real_urlopen = urllib.request.urlopen
+
+    def smart_urlopen(req, *args, **kwargs):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        if "127.0.0.1" in url:
+            return real_urlopen(req, *args, **kwargs)
+        fake_upstream = io.BytesIO(
+            b'{"choices": [{"message": {"content": "Mocked test response"}}], "usage": {"prompt_tokens": 10, "completion_tokens": 5}}'
+        )
+        fake_upstream.status = 200  # type: ignore
+        return fake_upstream
+
     try:
         time.sleep(0.1)
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{port}/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse",
-            data=b"{}",
-            headers={"Content-Type": "application/json"},
-        )
-        t0 = time.time()
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            data = resp.read()
-            assert len(data) > 0
-            assert b"data:" in data
-            assert time.time() - t0 < 4.0, "SSE response should close immediately upon EOF"
+        with patch("urllib.request.urlopen", side_effect=smart_urlopen):
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+            )
+            t0 = time.time()
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                data = resp.read()
+                assert len(data) > 0
+                assert b"data:" in data
+                assert time.time() - t0 < 1.0, "SSE response should close immediately upon EOF"
     finally:
         server.shutdown()
         server.server_close()

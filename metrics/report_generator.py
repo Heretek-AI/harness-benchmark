@@ -27,14 +27,14 @@ def _fmt(value, spec: str = "") -> str:
     return str(value)
 
 
-def render_json(report: "RunReport") -> str:
+def render_json(report: RunReport) -> str:
     """Return the JSON-serialised report (helper for the CLI)."""
     import json
 
     return json.dumps(report.to_dict(), indent=2, default=str)
 
 
-def render_markdown(report: "RunReport") -> str:
+def render_markdown(report: RunReport) -> str:
     """Render a single ``RunReport`` as a Markdown comparison table."""
     lines: list[str] = []
     lines.append(f"# Benchmark run: `{report.config.name}`")
@@ -45,19 +45,14 @@ def render_markdown(report: "RunReport") -> str:
         lines.append(f"- **Finished**: `{report.finished_at}`")
     lines.append("")
     lines.append(
-        "| Harness | Benchmark | Plugins | MCP | Pass@1 | Latency p50 | "
-        "Latency p95 | Tokens (in/out) | Cost | Tasks |"
+        "| Harness | Benchmark | Plugins | MCP | Pass@1 | Latency p50 | Latency p95 | Tokens (in/out) | Cost | Tasks |"
     )
-    lines.append(
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|"
-    )
+    lines.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|")
     for cell in report.metric_summaries:
         s = cell["summary"]
         plugins = ",".join(cell["plugins"]) or "none"
         mcp = ",".join(cell["mcp_servers"]) or "none"
-        tokens = (
-            f"{_fmt(s['tokens_input_total'], 'int')}/{_fmt(s['tokens_output_total'], 'int')}"
-        )
+        tokens = f"{_fmt(s['tokens_input_total'], 'int')}/{_fmt(s['tokens_output_total'], 'int')}"
         lines.append(
             "| {h} | {b} | {p} | {m} | {pass_} | {p50} | {p95} | {tok} | {cost} | {n} |".format(
                 h=cell["harness"],
@@ -83,14 +78,11 @@ def render_markdown(report: "RunReport") -> str:
         for tool, count in cell["summary"]["tool_calls_by_name"].items():
             plugins = ",".join(cell["plugins"]) or "none"
             mcp = ",".join(cell["mcp_servers"]) or "none"
-            lines.append(
-                f"| {cell['harness']} | {cell['benchmark']} | {plugins} | "
-                f"{mcp} | {tool} | {count} |"
-            )
+            lines.append(f"| {cell['harness']} | {cell['benchmark']} | {plugins} | {mcp} | {tool} | {count} |")
     return "\n".join(lines) + "\n"
 
 
-def render_github_summary(report: "RunReport") -> str:
+def render_github_summary(report: RunReport) -> str:
     """Same as ``render_markdown`` with a run-header banner prepended."""
     banner = (
         f"## 🤖 Harness Benchmark — `{report.config.name}`\n\n"

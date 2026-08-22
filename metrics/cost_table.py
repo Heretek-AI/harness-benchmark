@@ -48,8 +48,5 @@ def cost_for(model: str, tokens_in: int, tokens_out: int) -> float | None:
     entry = _PRICING.get(model)
     if entry is None:
         return None
-    cost = (
-        (tokens_in / 1_000_000) * entry["input"]
-        + (tokens_out / 1_000_000) * entry["output"]
-    )
+    cost = (tokens_in / 1_000_000) * entry["input"] + (tokens_out / 1_000_000) * entry["output"]
     return round(cost, 6)

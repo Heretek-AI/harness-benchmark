@@ -189,9 +189,7 @@ class BaseAgentAdapter(abc.ABC):
         non-default behaviour (e.g., Claude Code parses ``--verbose`` JSONL
         after the subprocess completes).
         """
-        return self._run_cli(
-            self._build_command(prompt, workspace_dir), workspace_dir, timeout
-        )
+        return self._run_cli(self._build_command(prompt, workspace_dir), workspace_dir, timeout)
 
     def _run_cli(
         self,
@@ -246,17 +244,15 @@ class BaseAgentAdapter(abc.ABC):
             tokens_input=tokens_in,
             tokens_output=tokens_out,
             tokens_total=(
-                (tokens_in or 0) + (tokens_out or 0)
-                if tokens_in is not None and tokens_out is not None
-                else None
+                (tokens_in or 0) + (tokens_out or 0) if tokens_in is not None and tokens_out is not None else None
             ),
             tool_calls=tool_calls,
         )
 
     def _materialize_tool_artifacts(self, stdout: str, workspace_dir: Path) -> None:
         """Execute filesystem and shell actions emitted in structured tags if any."""
-        import re
         import json
+        import re
         import subprocess
 
         # 1. <write_file><file_path>...</file_path><content>...</content></write_file>
@@ -447,6 +443,7 @@ class BaseAgentAdapter(abc.ABC):
 
         # Count XML-style tool calls in raw stdout (e.g. from Gemini, Reasonix, Antigravity)
         import re
+
         xml_tool_patterns = [
             (r"<write_file\b|<file_write\b", "write_file"),
             (r"<read_file\b|<file_read\b", "read_file"),

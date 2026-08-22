@@ -62,9 +62,7 @@ class PluginLoader:
         try:
             return self._entries[name]
         except KeyError as exc:
-            raise KeyError(
-                f"plugin {name!r} not in registry; known: {sorted(self._entries)}"
-            ) from exc
+            raise KeyError(f"plugin {name!r} not in registry; known: {sorted(self._entries)}") from exc
 
     def synthesize_agent_config(
         self,
@@ -79,9 +77,7 @@ class PluginLoader:
         Caller is responsible for cleanup (the runner passes the path into
         the adapter, which scrubs it via ``BaseAgentAdapter.teardown``).
         """
-        cleaned: list[str] = [
-            n for n in (plugin_names or []) if n and n != "none"
-        ]
+        cleaned: list[str] = [n for n in (plugin_names or []) if n and n != "none"]
         if not cleaned:
             return None
 

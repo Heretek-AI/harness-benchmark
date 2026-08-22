@@ -6,11 +6,11 @@ The runner resolves ``harness`` CLI args against ``ADAPTERS``.
 
 from __future__ import annotations
 
+from agents.antigravity_adapter import AntigravityAdapter
 from agents.base import BaseAgentAdapter, ExecutionResult
 
 # Real adapters (filled in below).
 from agents.claude_code_adapter import ClaudeCodeAdapter
-from agents.antigravity_adapter import AntigravityAdapter
 from agents.deepseek_harness_adapter import DeepSeekHarnessAdapter, DeepSeekReasonixAdapter
 from agents.gemini_cli_adapter import GeminiCLIAdapter
 from agents.opencode_adapter import OpenCodeAdapter
@@ -36,9 +36,7 @@ def resolve(name: str) -> BaseAgentAdapter:
     try:
         return ADAPTERS[name]()
     except KeyError as exc:
-        raise KeyError(
-            f"unknown harness {name!r}; known: {sorted(ADAPTERS)}"
-        ) from exc
+        raise KeyError(f"unknown harness {name!r}; known: {sorted(ADAPTERS)}") from exc
 
 
 __all__ = [

@@ -62,6 +62,7 @@ def test_render_markdown_contains_table_rows() -> None:
 
 def test_export_junit_xml(tmp_path: Path) -> None:
     from metrics.junit_exporter import export_junit_xml
+
     results = [
         _r(True, 0.1),
         _r(False, 0.2),
@@ -73,4 +74,4 @@ def test_export_junit_xml(tmp_path: Path) -> None:
     assert '<testsuite name="test-suite" tests="2" failures="1"' in content
     assert '<testcase name="t-0.1"' in content
     assert '<testcase name="t-0.2"' in content
-    assert '<failure message=' in content
+    assert "<failure message=" in content

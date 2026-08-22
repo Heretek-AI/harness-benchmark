@@ -84,10 +84,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         # accepts a single --plugin-dir per invocation, so we expect exactly
         # one staging root.
         if plugins and plugins != ["none"] and ctx.plugin_dir is None:
-            raise ValueError(
-                "plugin loader did not produce a plugin_dir for "
-                f"plugins={plugins!r}"
-            )
+            raise ValueError(f"plugin loader did not produce a plugin_dir for plugins={plugins!r}")
 
         # MCP config: synthesize the JSON Claude Code consumes.
         if mcp_servers and mcp_servers != ["none"]:
@@ -144,14 +141,10 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         except subprocess.TimeoutExpired as exc:
             duration = time.monotonic() - start
             stdout = (
-                exc.stdout.decode("utf-8", errors="replace")
-                if isinstance(exc.stdout, bytes)
-                else (exc.stdout or "")
+                exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
             )
             stderr = (
-                exc.stderr.decode("utf-8", errors="replace")
-                if isinstance(exc.stderr, bytes)
-                else (exc.stderr or "")
+                exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
             )
             return ExecutionResult(
                 harness=self.name,
@@ -195,9 +188,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             tokens_input=tokens_in,
             tokens_output=tokens_out,
             tokens_total=(
-                (tokens_in or 0) + (tokens_out or 0)
-                if tokens_in is not None and tokens_out is not None
-                else None
+                (tokens_in or 0) + (tokens_out or 0) if tokens_in is not None and tokens_out is not None else None
             ),
             tool_calls=tool_calls,
         )
@@ -229,8 +220,7 @@ def _build_mcp_config(ctx: AdapterContext, mcp_servers: list[str]) -> _MCPConfig
             registry_path = str(candidate)
     if registry_path is None:
         raise RuntimeError(
-            "MCP registry not found; set HARNESS_BENCH_MCP_REGISTRY or "
-            "create mcp/mcp_registry.json at repo root"
+            "MCP registry not found; set HARNESS_BENCH_MCP_REGISTRY or create mcp/mcp_registry.json at repo root"
         )
 
     registry = json.loads(_P(registry_path).read_text())
@@ -239,10 +229,7 @@ def _build_mcp_config(ctx: AdapterContext, mcp_servers: list[str]) -> _MCPConfig
         spec = registry["servers"].get(name)
         if spec is None:
             raise KeyError(f"MCP server {name!r} not in registry {registry_path}")
-        env = {
-            k: os.path.expandvars(v) if isinstance(v, str) else v
-            for k, v in (spec.get("env") or {}).items()
-        }
+        env = {k: os.path.expandvars(v) if isinstance(v, str) else v for k, v in (spec.get("env") or {}).items()}
         servers[name] = {
             "command": spec["command"],
             "args": spec.get("args", []),

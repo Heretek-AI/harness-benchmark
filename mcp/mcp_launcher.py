@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import shutil
-import signal
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -52,9 +51,7 @@ class MCPLauncher:
         try:
             return self._entries[name]
         except KeyError as exc:
-            raise KeyError(
-                f"MCP server {name!r} not in registry; known: {sorted(self._entries)}"
-            ) from exc
+            raise KeyError(f"MCP server {name!r} not in registry; known: {sorted(self._entries)}") from exc
 
     # ---- lifecycle ----
 
@@ -74,17 +71,12 @@ class MCPLauncher:
                 # SSE / HTTP transports don't need a local subprocess;
                 # return a handle carrying the URL so the adapter can
                 # reference it.
-                handles.append(
-                    MCPServerHandle(name=name, spec=entry, transport=transport)
-                )
+                handles.append(MCPServerHandle(name=name, spec=entry, transport=transport))
                 continue
             cmd = [entry["command"], *entry.get("args", [])]
             env = {
                 **os.environ,
-                **{
-                    k: os.path.expandvars(v) if isinstance(v, str) else v
-                    for k, v in (entry.get("env") or {}).items()
-                },
+                **{k: os.path.expandvars(v) if isinstance(v, str) else v for k, v in (entry.get("env") or {}).items()},
             }
             try:
                 proc = subprocess.Popen(
@@ -96,22 +88,12 @@ class MCPLauncher:
                 )
             except (FileNotFoundError, OSError) as exc:
                 logger.warning("failed to spawn MCP %s: %s", name, exc)
-                handles.append(
-                    MCPServerHandle(
-                        name=name, spec=entry, proc=None, transport=transport
-                    )
-                )
+                handles.append(MCPServerHandle(name=name, spec=entry, proc=None, transport=transport))
                 continue
-            handles.append(
-                MCPServerHandle(
-                    name=name, spec=entry, proc=proc, transport=transport, pid=proc.pid
-                )
-            )
+            handles.append(MCPServerHandle(name=name, spec=entry, proc=proc, transport=transport, pid=proc.pid))
         return handles
 
-    def wait_ready(
-        self, handles: list[MCPServerHandle], timeout: float = 5.0
-    ) -> None:
+    def wait_ready(self, handles: list[MCPServerHandle], timeout: float = 5.0) -> None:
         """Best-effort readiness probe.
 
         stdio MCP servers don't expose a liveness signal over their stdio

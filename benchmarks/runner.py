@@ -32,9 +32,10 @@ from typing import Any
 
 from agents import ADAPTERS, BaseAgentAdapter
 from agents.base import ExecutionResult
-from benchmarks import REGISTRY as BENCHMARKS, BaseBenchmark, TaskSpec
+from benchmarks import REGISTRY as BENCHMARKS
+from benchmarks import BaseBenchmark
 from metrics.collector import MetricCollector
-from metrics.report_generator import render_json, render_markdown
+from metrics.report_generator import render_markdown
 from plugins import PluginLoader
 
 logger = logging.getLogger(__name__)
@@ -99,9 +100,7 @@ class BenchmarkRunner:
         # Patch env so adapters can find the registries without us having
         # to plumb paths through every constructor call.
         os.environ["HARNESS_BENCH_MCP_REGISTRY"] = str(mcp_launcher.registry_path)
-        os.environ.setdefault(
-            "HARNESS_BENCH_PLUGIN_REGISTRY", str(plugin_loader.registry_path)
-        )
+        os.environ.setdefault("HARNESS_BENCH_PLUGIN_REGISTRY", str(plugin_loader.registry_path))
 
     # ---- public ----
 
@@ -129,9 +128,7 @@ class BenchmarkRunner:
                 plugins,
                 mcp_servers,
             )
-            cell_results = self._run_cell(
-                harness, benchmark, plugins, mcp_servers, run_dir
-            )
+            cell_results = self._run_cell(harness, benchmark, plugins, mcp_servers, run_dir)
             report.results.extend(cell_results)
             self.metric_collector.reset()
             for r in cell_results:
@@ -169,9 +166,7 @@ class BenchmarkRunner:
 
         adapter: BaseAgentAdapter = ADAPTERS[harness_name]()
         benchmark: BaseBenchmark = BENCHMARKS[benchmark_name]()
-        plugin_dir = self.plugin_loader.synthesize_agent_config(
-            harness_name, plugins
-        )
+        plugin_dir = self.plugin_loader.synthesize_agent_config(harness_name, plugins)
         mcp_handles = self.mcp_launcher.launch(mcp_servers)
         self.mcp_launcher.wait_ready(mcp_handles)
 
@@ -199,15 +194,15 @@ class BenchmarkRunner:
                     cwd = cwd / task.workspace_subdir
                     cwd.mkdir(parents=True, exist_ok=True)
                 benchmark.pre_setup(cwd)
-                result = adapter.execute_task(
-                    task.prompt, cwd, timeout=self.config.timeout_seconds
-                )
+                result = adapter.execute_task(task.prompt, cwd, timeout=self.config.timeout_seconds)
                 result.benchmark = benchmark_name
                 result.task_id = task.task_id
                 result.plugins = list(plugins)
                 result.mcp_servers = list(mcp_servers)
                 result.passed = benchmark.grade(result, task.expected, cwd=cwd)
-                if (result.tokens_input is not None or result.tokens_output is not None) and result.tokens_total is None:
+                if (
+                    result.tokens_input is not None or result.tokens_output is not None
+                ) and result.tokens_total is None:
                     result.tokens_total = (result.tokens_input or 0) + (result.tokens_output or 0)
                 if result.tokens_total is not None and result.cost_usd is None:
                     result.cost_usd = BaseAgentAdapter.estimate_cost(
@@ -217,9 +212,7 @@ class BenchmarkRunner:
                     )
                 results.append(result)
                 # Per-task JSONL artifact for downstream drill-down.
-                with (run_dir / f"{harness_name}__{benchmark_name}__{task.task_id}.jsonl").open(
-                    "a"
-                ) as f:
+                with (run_dir / f"{harness_name}__{benchmark_name}__{task.task_id}.jsonl").open("a") as f:
                     f.write(result.model_dump_json() + "\n")
         finally:
             try:
@@ -259,9 +252,7 @@ class BenchmarkRunner:
     # ---- outputs ----
 
     def _write_outputs(self, report: RunReport, run_dir: Path) -> None:
-        (run_dir / "result.json").write_text(
-            json.dumps(report.to_dict(), indent=2, default=str)
-        )
+        (run_dir / "result.json").write_text(json.dumps(report.to_dict(), indent=2, default=str))
         if self.config.output_format in ("markdown", "github-summary"):
             (run_dir / "REPORT.md").write_text(render_markdown(report))
         logger.info("wrote outputs to %s", run_dir)

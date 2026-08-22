@@ -29,12 +29,8 @@ def test_synthesize_with_none_returns_none(plugin_registry_path: Path) -> None:
     assert out is None
 
 
-def test_synthesize_makes_staging_root(
-    plugin_registry_path: Path, tmp_path: Path
-) -> None:
+def test_synthesize_makes_staging_root(plugin_registry_path: Path, tmp_path: Path) -> None:
     loader = PluginLoader(plugin_registry_path)
-    staging = loader.synthesize_agent_config(
-        "claude-code", ["caveman"], staging_root=tmp_path / "plugins"
-    )
+    staging = loader.synthesize_agent_config("claude-code", ["caveman"], staging_root=tmp_path / "plugins")
     assert staging is not None
     assert (staging / "caveman").exists()

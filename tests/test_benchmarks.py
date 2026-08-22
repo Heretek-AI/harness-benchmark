@@ -123,14 +123,17 @@ def test_coder_eval_oracle_test_asserts(tmp_path: Path) -> None:
         stdout="```python\ndef fibonacci(n):\n    if n <= 0:\n        return 0\n    elif n == 1:\n        return 1\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```",
         stderr="",
     )
-    assert bench.grade(
-        res_good,
-        {
-            "function_name": "fibonacci",
-            "test_asserts": "assert fibonacci(0) == 0\nassert fibonacci(1) == 1\nassert fibonacci(10) == 55",
-        },
-        cwd=tmp_path,
-    ) is True
+    assert (
+        bench.grade(
+            res_good,
+            {
+                "function_name": "fibonacci",
+                "test_asserts": "assert fibonacci(0) == 0\nassert fibonacci(1) == 1\nassert fibonacci(10) == 55",
+            },
+            cwd=tmp_path,
+        )
+        is True
+    )
 
     # Fail: broken implementation fails oracle assertions even if exit_code is 0 and mentions 55
     res_broken = ExecutionResult(
@@ -144,11 +147,14 @@ def test_coder_eval_oracle_test_asserts(tmp_path: Path) -> None:
         stdout="Here is the explanation for 55: ```python\ndef fibonacci(n):\n    return n * 5\n```",
         stderr="",
     )
-    assert bench.grade(
-        res_broken,
-        {
-            "function_name": "fibonacci",
-            "test_asserts": "assert fibonacci(0) == 0\nassert fibonacci(1) == 1\nassert fibonacci(10) == 55",
-        },
-        cwd=tmp_path,
-    ) is False
+    assert (
+        bench.grade(
+            res_broken,
+            {
+                "function_name": "fibonacci",
+                "test_asserts": "assert fibonacci(0) == 0\nassert fibonacci(1) == 1\nassert fibonacci(10) == 55",
+            },
+            cwd=tmp_path,
+        )
+        is False
+    )

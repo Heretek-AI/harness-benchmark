@@ -17,11 +17,11 @@ Run a one-off sweep over claude-code + coder_eval + each MCP::
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -31,10 +31,10 @@ REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from benchmarks.runner import BenchmarkRunner, RunConfig
-from mcp import MCPLauncher
-from metrics import render_github_summary, render_json, render_markdown
-from plugins import PluginLoader
+from benchmarks.runner import BenchmarkRunner, RunConfig  # noqa: E402
+from mcp import MCPLauncher  # noqa: E402
+from metrics import render_github_summary, render_json, render_markdown  # noqa: E402
+from plugins import PluginLoader  # noqa: E402
 
 
 def _split_csv(value: str) -> list[str]:
@@ -56,9 +56,7 @@ def _resolve_registry_paths(args: argparse.Namespace) -> tuple[Path, Path]:
         or REPO_ROOT / "plugins" / "registry.json"
     )
     mcp_registry = Path(
-        args.mcp_registry
-        or os.environ.get("HARNESS_BENCH_MCP_REGISTRY")
-        or REPO_ROOT / "mcp" / "mcp_registry.json"
+        args.mcp_registry or os.environ.get("HARNESS_BENCH_MCP_REGISTRY") or REPO_ROOT / "mcp" / "mcp_registry.json"
     )
     return plugin_registry, mcp_registry
 
@@ -113,15 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Strict floor (0.0 - 1.0) for cell pass-rate. Fails with exit code 1 if below floor.",
     )
-    parser.add_argument(
-        "--name", default=None, help="Run name; becomes the run-id prefix."
-    )
-    parser.add_argument(
-        "--plugin-registry", type=Path, help="Override plugins/registry.json path"
-    )
-    parser.add_argument(
-        "--mcp-registry", type=Path, help="Override mcp/mcp_registry.json path"
-    )
+    parser.add_argument("--name", default=None, help="Run name; becomes the run-id prefix.")
+    parser.add_argument("--plugin-registry", type=Path, help="Override plugins/registry.json path")
+    parser.add_argument("--mcp-registry", type=Path, help="Override mcp/mcp_registry.json path")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 
@@ -152,26 +144,10 @@ def main(argv: list[str] | None = None) -> int:
     plugins = _resolve_list(args.plugins, matrix.get("plugins"), "none")
     mcp = _resolve_list(args.mcp_servers, matrix.get("mcp_servers"), "none")
 
-    tasks_limit = (
-        args.tasks_limit
-        if args.tasks_limit is not None
-        else int(preset.get("tasks_limit", 0) or 0)
-    )
-    timeout_seconds = (
-        args.timeout
-        if args.timeout is not None
-        else int(preset.get("timeout_seconds", 600) or 600)
-    )
-    output_format = (
-        args.output_format
-        if args.output_format is not None
-        else str(preset.get("output_format", "json"))
-    )
-    name = (
-        args.name
-        if args.name is not None
-        else str(preset.get("name") or "ad-hoc")
-    )
+    tasks_limit = args.tasks_limit if args.tasks_limit is not None else int(preset.get("tasks_limit", 0) or 0)
+    timeout_seconds = args.timeout if args.timeout is not None else int(preset.get("timeout_seconds", 600) or 600)
+    output_format = args.output_format if args.output_format is not None else str(preset.get("output_format", "json"))
+    name = args.name if args.name is not None else str(preset.get("name") or "ad-hoc")
 
     config = RunConfig(
         name=name,
@@ -194,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.junit_xml:
         from metrics.junit_exporter import export_junit_xml
+
         export_junit_xml(report.results, args.junit_xml, suite_name=report.config.name)
 
     # Also print to stdout for ad-hoc local debugging; the per-run files
@@ -214,7 +191,9 @@ def main(argv: list[str] | None = None) -> int:
                 failed_cells.append((cell.get("harness"), cell.get("benchmark"), rate))
         if failed_cells:
             for h, b, r in failed_cells:
-                print(f"::error::Score floor failed for {h} on {b}: {r*100:.1f}% < {floor*100:.1f}%", file=sys.stderr)
+                print(
+                    f"::error::Score floor failed for {h} on {b}: {r * 100:.1f}% < {floor * 100:.1f}%", file=sys.stderr
+                )
             return 1
 
     return 0

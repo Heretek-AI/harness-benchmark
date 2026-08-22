@@ -14,11 +14,7 @@ import yaml
     "preset_name",
     ["full_matrix", "mcp_isolation", "smoke_test"],
 )
-def test_preset_validates_against_schema(
-    repo_root: Path, preset_name: str
-) -> None:
+def test_preset_validates_against_schema(repo_root: Path, preset_name: str) -> None:
     schema = json.loads((repo_root / "configs" / "schema.json").read_text())
-    preset = yaml.safe_load(
-        (repo_root / "configs" / "presets" / f"{preset_name}.yaml").read_text()
-    )
+    preset = yaml.safe_load((repo_root / "configs" / "presets" / f"{preset_name}.yaml").read_text())
     jsonschema.validate(preset, schema)

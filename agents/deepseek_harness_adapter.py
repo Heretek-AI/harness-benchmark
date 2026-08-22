@@ -88,11 +88,7 @@ class DeepSeekReasonixAdapter(DeepSeekHarnessAdapter):
 
         ctx.extra_env["REASONIX_HOME"] = str(ctx.workspace_dir)
 
-        dotenv_content = (
-            f"REASONIX_API_KEY={api_key}\n"
-            f"DEEPSEEK_API_KEY={api_key}\n"
-            f"OPENAI_API_KEY={api_key}\n"
-        )
+        dotenv_content = f"REASONIX_API_KEY={api_key}\nDEEPSEEK_API_KEY={api_key}\nOPENAI_API_KEY={api_key}\n"
         (ctx.workspace_dir / ".env").write_text(dotenv_content)
         home_reasonix = Path.home() / ".reasonix"
         home_reasonix.mkdir(parents=True, exist_ok=True)

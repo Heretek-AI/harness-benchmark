@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from benchmarks.runner import BenchmarkRunner, RunConfig
 from mcp import MCPLauncher
 from plugins import PluginLoader
