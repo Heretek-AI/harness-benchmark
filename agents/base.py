@@ -542,3 +542,189 @@ class BaseAgentAdapter(abc.ABC):
         from metrics.cost_table import cost_for
 
         return cost_for(model, tokens_in, tokens_out)
+
+
+# ── Multi-turn conversation replay adapter ─────────────────────────────
+
+
+class ConversationReplayAdapter:
+    """Drive a multi-turn conversation through a BaseAgentAdapter.
+
+    Takes a MultiTurnTask and replays it turn-by-turn through any
+    harness adapter. Collects per-turn results including tool calls,
+    token usage, and latency.
+
+    Usage::
+
+        from benchmarks.base import MultiTurnTask, TurnSpec
+        from agents.base import ConversationReplayAdapter, StubAdapter
+
+        task = MultiTurnTask(
+            task_id="demo",
+            name="Demo",
+            turns=[
+                TurnSpec(role="user", content="Create a file called hello.py"),
+                TurnSpec(role="assistant", content=""),  # agent generates
+                TurnSpec(role="user", content="Now run it"),
+                TurnSpec(role="assistant", content=""),
+            ],
+        )
+
+        adapter = StubAdapter()
+        replay = ConversationReplayAdapter(adapter)
+        result = replay.run(task, workspace_dir=Path("/tmp/demo"))
+    """
+
+    def __init__(self, adapter: BaseAgentAdapter) -> None:
+        self.adapter = adapter
+
+    def run(
+        self,
+        task: MultiTurnTask,
+        workspace_dir: Path,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> MultiTurnResult:
+        """Replay a multi-turn task through the adapter.
+
+        Each user turn is sent to the adapter. The adapter's response
+        becomes context for the next user turn. Tool calls and token
+        usage are collected per turn.
+        """
+        import time
+
+        conversation_history: list[dict[str, str]] = []
+        turn_results: list[TurnResult] = []
+        total_tokens_in = 0
+        total_tokens_out = 0
+        total_cost = 0.0
+
+        max_turns = min(task.max_turns, len(task.turns))
+        effective_timeout = timeout or task.timeout_seconds
+
+        for i, turn in enumerate(task.turns[:max_turns]):
+            if turn.role == "user":
+                conversation_history.append({"role": "user", "content": turn.content})
+                continue
+
+            # Assistant turn — send accumulated conversation to adapter
+            prompt = self._build_prompt(conversation_history)
+
+            t0 = time.monotonic()
+            try:
+                result = self.adapter.run(
+                    prompt=prompt,
+                    workspace_dir=workspace_dir,
+                    env=env,
+                    timeout=effective_timeout,
+                )
+                latency = time.monotonic() - t0
+            except Exception as exc:
+                latency = time.monotonic() - t0
+                result = ExecutionResult(
+                    task_id=task.task_id,
+                    harness=self.adapter.name,
+                    benchmark="multi_turn",
+                    prompt=prompt,
+                    stdout="",
+                    stderr=str(exc),
+                    exit_code=1,
+                    duration_seconds=latency,
+                )
+
+            # Extract metrics
+            tokens_in, tokens_out = self.adapter.extract_token_usage(result.stdout)
+            tool_calls = self.adapter.count_tool_calls(result.stdout)
+
+            if tokens_in:
+                total_tokens_in += tokens_in
+            if tokens_out:
+                total_tokens_out += tokens_out
+
+            cost = self.adapter.estimate_cost(
+                self.adapter.name,
+                tokens_in or 0,
+                tokens_out or 0,
+            )
+            if cost:
+                total_cost += cost
+
+            # Build turn result
+            turn_result = TurnResult(
+                turn_index=i,
+                role="assistant",
+                content=result.stdout,
+                tool_calls=tool_calls,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                latency_seconds=latency,
+                exit_code=result.exit_code,
+            )
+            turn_results.append(turn_result)
+
+            # Add to conversation history
+            conversation_history.append({"role": "assistant", "content": result.stdout})
+
+        # Overall result
+        all_passed = all(tr.exit_code == 0 for tr in turn_results) if turn_results else False
+        total_latency = sum(tr.latency_seconds for tr in turn_results)
+
+        return MultiTurnResult(
+            task_id=task.task_id,
+            harness=self.adapter.name,
+            turn_results=turn_results,
+            total_turns=len(turn_results),
+            all_turns_passed=all_passed,
+            total_tokens_in=total_tokens_in,
+            total_tokens_out=total_tokens_out,
+            total_cost_usd=total_cost,
+            total_latency_seconds=total_latency,
+        )
+
+    def _build_prompt(self, history: list[dict[str, str]]) -> str:
+        """Build a single prompt from conversation history."""
+        parts = []
+        for msg in history:
+            role = msg["role"].upper()
+            parts.append(f"[{role}]\n{msg['content']}")
+        return "\n\n".join(parts)
+
+
+@dataclass
+class TurnResult:
+    """Result of a single turn in a multi-turn conversation."""
+
+    turn_index: int
+    role: str
+    content: str
+    tool_calls: dict[str, int] = field(default_factory=dict)
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    latency_seconds: float = 0.0
+    exit_code: int = 0
+
+
+@dataclass
+class MultiTurnResult:
+    """Aggregated result of a multi-turn conversation replay."""
+
+    task_id: str
+    harness: str
+    turn_results: list[TurnResult]
+    total_turns: int
+    all_turns_passed: bool
+    total_tokens_in: int = 0
+    total_tokens_out: int = 0
+    total_cost_usd: float = 0.0
+    total_latency_seconds: float = 0.0
+
+    @property
+    def score(self) -> float:
+        """Simple score: fraction of turns that succeeded."""
+        if not self.turn_results:
+            return 0.0
+        return sum(1 for t in self.turn_results if t.exit_code == 0) / len(self.turn_results)
+
+    @property
+    def total_tokens(self) -> int:
+        return self.total_tokens_in + self.total_tokens_out
