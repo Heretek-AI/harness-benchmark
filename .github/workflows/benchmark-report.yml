@@ -34,21 +34,23 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ./downloaded-artifacts
 
-      - name: Generate and Publish Date-Labeled GitHub Issue Report
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        working-directory: ${{ github.workspace }}
-        shell: python
+      - name: Write report publisher script
         run: |
+          cat > /tmp/publish_report.py << 'PYEOF'
           import json
           import os
           import sys
           from pathlib import Path
+
+          # Ensure repo root is on sys.path so core/evaluation/reporting are importable
+          repo_root = os.environ.get("GITHUB_WORKSPACE", os.getcwd())
+          if repo_root not in sys.path:
+              sys.path.insert(0, repo_root)
+
           from core.types import BenchmarkReport, CellSummary, MetricSummary, ExecutionResult
           from reporting.github_issue import GitHubIssuePublisher
 
-          artifacts_root = Path("./downloaded-artifacts")
+          artifacts_root = Path(repo_root) / "downloaded-artifacts"
           results = []
           cell_summaries = []
           run_id = f"gh-{os.environ.get('GITHUB_RUN_ID', 'ci')}"
@@ -87,3 +89,10 @@ jobs:
               print(f"Published benchmark report to GitHub Issue: {issue_url}")
           else:
               print("Warning: Could not publish GitHub issue.")
+          PYEOF
+
+      - name: Generate and Publish Date-Labeled GitHub Issue Report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python /tmp/publish_report.py
