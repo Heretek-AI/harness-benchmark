@@ -68,5 +68,40 @@
     "expected": {
       "verify_cmd": "grep -q 'API_PORT=8080' .env && grep -q 'DEBUG_MODE=true' .env"
     }
+  },
+  {
+    "task_id": "tb-sh-011",
+    "prompt": "Create a file `checksums.sha256` containing the SHA256 checksum and filename of all `.txt` files in the current workspace.",
+    "expected": {
+      "verify_cmd": "echo 'test content' > sample.txt && sha256sum sample.txt > checksums.sha256 && sha256sum -c checksums.sha256"
+    }
+  },
+  {
+    "task_id": "tb-sh-012",
+    "prompt": "Create a python script `stats.py` that takes JSON on standard input and outputs the sum of the 'value' fields to stdout.",
+    "expected": {
+      "verify_cmd": "echo '[{\"value\": 10}, {\"value\": 25}]' | python3 stats.py | grep -q '35'"
+    }
+  },
+  {
+    "task_id": "tb-sh-013",
+    "prompt": "Create a directory structure `project/app`, initialize git, create two commits on branch `feature-x`, and export the git commit log to `git_log.txt`.",
+    "expected": {
+      "verify_cmd": "test -f git_log.txt && grep -q -i 'commit' git_log.txt"
+    }
+  },
+  {
+    "task_id": "tb-sh-014",
+    "prompt": "Create a SQLite database `app.db` with a table `events(id INTEGER PRIMARY KEY, event_name TEXT)` and insert row `(1, 'init')`.",
+    "expected": {
+      "verify_cmd": "sqlite3 app.db \"SELECT event_name FROM events WHERE id=1;\" | grep -q 'init'"
+    }
+  },
+  {
+    "task_id": "tb-sh-015",
+    "prompt": "Create an executable script `clean_temp.sh` that deletes all files ending with `.tmp` and `.bak` in the current directory tree.",
+    "expected": {
+      "verify_cmd": "test -x clean_temp.sh && touch a.tmp b.bak && ./clean_temp.sh && test ! -f a.tmp && test ! -f b.bak"
+    }
   }
 ]

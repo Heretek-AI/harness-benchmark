@@ -90,6 +90,17 @@ class BaseAgentAdapter(abc.ABC):
             raise
         return self._ctx
 
+    def setup_env(self, env_vars: dict[str, str]) -> None:
+        """Merge environment variables into adapter context."""
+        if self._ctx:
+            self._ctx.extra_env.update(env_vars)
+
+    def attach_lsp(self, workspace_dir: Path) -> list[str]:
+        """Run AST / LSP diagnostics on the workspace and return any syntax/type errors."""
+        from core.lsp import LSPDiagnosticsEngine
+
+        return LSPDiagnosticsEngine.check_workspace(workspace_dir)
+
     def get_llm_config(self, ctx: AdapterContext | None = None) -> tuple[str, str, str]:
         """Resolve (api_base, api_key, model) from adapter context or ambient environment."""
         target_ctx = ctx or self._ctx

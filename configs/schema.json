@@ -54,7 +54,7 @@
     },
     "output_format": {
       "type": "string",
-      "enum": ["json", "markdown", "github-summary"],
+      "enum": ["json", "markdown", "github-summary", "scorecard"],
       "default": "json"
     },
     "env": {

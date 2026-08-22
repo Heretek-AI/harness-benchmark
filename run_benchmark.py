@@ -46,6 +46,13 @@ def _split_csv(value: str) -> list[str]:
 
 
 def _load_preset(path: Path) -> dict:
+    if not path.exists():
+        candidate = REPO_ROOT / "configs" / "presets" / f"{path.name}"
+        if candidate.exists():
+            return yaml.safe_load(candidate.read_text())
+        candidate_yaml = REPO_ROOT / "configs" / "presets" / f"{path.name}.yaml"
+        if candidate_yaml.exists():
+            return yaml.safe_load(candidate_yaml.read_text())
     return yaml.safe_load(path.read_text())
 
 
@@ -69,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
             "configured LLM and emit JSON + Markdown artefacts."
         ),
     )
-    parser.add_argument("--config", type=Path, help="Preset YAML to load")
+    parser.add_argument("--config", "--preset", dest="config", type=Path, help="Preset YAML to load (or preset name)")
     parser.add_argument(
         "--harness",
         default=None,

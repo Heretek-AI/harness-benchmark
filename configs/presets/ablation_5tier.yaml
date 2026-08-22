@@ -1,0 +1,21 @@
+name: ablation_5tier
+description: Deterministic 5-Tier Ablation Benchmark evaluating Raw Baseline vs +LSP vs +Skills vs +MCP vs Full Stack.
+matrix:
+  harness:
+    - claude-code
+    - opencode
+    - DeepSeek-Reasonix
+    - gemini-cli
+    - antigravity-cli
+  benchmark:
+    - coder_eval
+    - terminal-bench
+  plugins:
+    - none
+    - caveman
+  mcp_servers:
+    - none
+    - repomix
+tasks_limit: 5
+timeout_seconds: 600
+output_format: markdown

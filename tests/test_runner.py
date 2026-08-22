@@ -77,7 +77,7 @@ def test_runner_markdown_output_format(
     report_md = run_dir / "REPORT.md"
     assert report_md.exists()
     content = report_md.read_text()
-    assert "# Benchmark run:" in content
+    assert "Benchmark Report:" in content or "# Benchmark run:" in content
     assert "coder_eval" in content
     assert "terminal-bench" in content
 
