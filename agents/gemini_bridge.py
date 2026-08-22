@@ -182,19 +182,23 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
+            self.send_header("Connection", "close")
             self.end_headers()
             
             chunk = f"data: {json.dumps(gemini_resp)}\n\n"
             self.wfile.write(chunk.encode("utf-8"))
             self.wfile.flush()
+            self.close_connection = True
         else:
             body = json.dumps(gemini_resp).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(body)
+            self.wfile.flush()
+            self.close_connection = True
 
 
 def run_server(port: int = 8999) -> None:

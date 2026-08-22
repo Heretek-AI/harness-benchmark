@@ -70,11 +70,14 @@ class GeminiCLIAdapter(BaseAgentAdapter):
         if model:
             ctx.extra_env["GEMINI_MODEL"] = model
         ctx.extra_env["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
+        ctx.extra_env["CI"] = "1"
+        ctx.extra_env["NO_COLOR"] = "1"
 
         # Materialize .gemini/settings.json
         gemini_dir = ctx.workspace_dir / ".gemini"
         gemini_dir.mkdir(parents=True, exist_ok=True)
         settings = {
+            "baseUrl": bridge_url,
             "model": {
                 "name": model or "gemini-2.5-pro",
             },

@@ -114,6 +114,40 @@ def test_gemini_adapter_setup_with_mcp(tmp_path: Path, mcp_registry_path: Path) 
         adapter.teardown()
 
 
+def test_gemini_bridge_sse_clean_termination() -> None:
+    import socket
+    import threading
+    import time
+    import urllib.request
+    from http.server import HTTPServer
+    from agents.gemini_bridge import GeminiBridgeHandler
+
+    s = socket.socket()
+    s.bind(("", 0))
+    port = s.getsockname()[1]
+    s.close()
+
+    server = HTTPServer(("127.0.0.1", port), GeminiBridgeHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    try:
+        time.sleep(0.1)
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+        )
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            data = resp.read()
+            assert len(data) > 0
+            assert b"data:" in data
+            assert time.time() - t0 < 1.0, "SSE response should close immediately upon EOF"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_opencode_adapter_setup(tmp_path: Path) -> None:
     adapter = OpenCodeAdapter()
     ctx = adapter.setup(
