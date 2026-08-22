@@ -86,7 +86,7 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             },
             "security": {
                 "auth": {
-                    "type": "gemini-api-key",
+                    "selectedType": "gemini-api-key",
                 },
                 "folderTrust": {
                     "enabled": False,
