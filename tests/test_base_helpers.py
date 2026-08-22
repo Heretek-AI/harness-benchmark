@@ -204,3 +204,32 @@ def test_extract_token_usage_gemini_cli_stats() -> None:
     inp, out = adapter.extract_token_usage(sample_stdout)
     assert inp == 500
     assert out == 120
+
+
+def test_universal_tool_counting() -> None:
+    adapter = GeminiCLIAdapter()
+    sample = """
+    <write_file><path>test.txt</path><content>hello</content></write_file>
+    <execute_bash><command>ls -la</command></execute_bash>
+    <tool_call>{"name": "custom_search", "arguments": {}}</tool_call>
+    """
+    counts = adapter.count_tool_calls(sample)
+    assert counts.get("write_file") == 1
+    assert counts.get("execute_bash") == 1
+    assert counts.get("custom_search") == 1
+
+
+def test_materialize_tool_artifacts(tmp_path: Path) -> None:
+    adapter = GeminiCLIAdapter()
+    sample = """
+    I'll create the file now.
+    <write_file>
+    <file_path>subdir/output.txt</file_path>
+    <content>antigravity_verified_content</content>
+    </write_file>
+    <tool_call>{"name": "run_shell_command", "arguments": {"command": "touch shell_marker.txt"}}</tool_call>
+    """
+    adapter._materialize_tool_artifacts(sample, tmp_path)
+    assert (tmp_path / "subdir" / "output.txt").exists()
+    assert (tmp_path / "subdir" / "output.txt").read_text() == "antigravity_verified_content"
+    assert (tmp_path / "shell_marker.txt").exists()

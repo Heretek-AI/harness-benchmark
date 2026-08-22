@@ -230,6 +230,7 @@ class BaseAgentAdapter(abc.ABC):
                 stderr=str(exc),
                 error=type(exc).__name__,
             )
+        self._materialize_tool_artifacts(proc.stdout, self.ctx.workspace_dir)
         tokens_in, tokens_out = self.extract_token_usage(proc.stdout)
         tool_calls = self.count_tool_calls(proc.stdout)
         return ExecutionResult(
@@ -251,6 +252,44 @@ class BaseAgentAdapter(abc.ABC):
             ),
             tool_calls=tool_calls,
         )
+
+    def _materialize_tool_artifacts(self, stdout: str, workspace_dir: Path) -> None:
+        """Execute filesystem and shell actions emitted in structured tags if any."""
+        import re
+        import json
+        import subprocess
+
+        # 1. <write_file><file_path>...</file_path><content>...</content></write_file>
+        for block in re.finditer(
+            r"<(?:write_file|file_write)>\s*<(?:file_path|path)>(.*?)</(?:file_path|path)>\s*<content>([\s\S]*?)</content>\s*</(?:write_file|file_write)>",
+            stdout,
+            re.IGNORECASE,
+        ):
+            rel_path = block.group(1).strip()
+            content = block.group(2)
+            if rel_path.startswith("/tmp/") and "workspace" in rel_path:
+                rel_path = rel_path.split("workspace/")[-1]
+            elif rel_path.startswith("/"):
+                rel_path = rel_path.lstrip("/")
+            target = workspace_dir / rel_path
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content)
+            except Exception:
+                pass
+
+        # 2. <tool_call>{"name": "run_shell_command", "arguments": {"command": "..."}}</tool_call>
+        for block in re.finditer(r"<tool_call>\s*(\{[\s\S]*?\})\s*</tool_call>", stdout, re.IGNORECASE):
+            try:
+                data = json.loads(block.group(1))
+                name = data.get("name")
+                args = data.get("arguments", {})
+                if name in ("run_shell_command", "bash", "execute_bash") and isinstance(args, dict):
+                    cmd = args.get("command") or args.get("cmd")
+                    if cmd and isinstance(cmd, str):
+                        subprocess.run(cmd, shell=True, cwd=workspace_dir, timeout=10, capture_output=True)
+            except Exception:
+                pass
 
     # ---- helpers for subclasses ----
 
@@ -396,6 +435,33 @@ class BaseAgentAdapter(abc.ABC):
                 for item in obj["tool_calls"]:
                     if isinstance(item, dict) and isinstance(item.get("name"), str):
                         counts[item["name"]] += 1
+            # Gemini CLI stats.tools.byName
+            elif isinstance(obj.get("stats"), dict):
+                tools_info = obj["stats"].get("tools", {})
+                if isinstance(tools_info, dict):
+                    by_name = tools_info.get("byName", {})
+                    if isinstance(by_name, dict):
+                        for name, count in by_name.items():
+                            if isinstance(count, int):
+                                counts[str(name)] += count
+
+        # Count XML-style tool calls in raw stdout (e.g. from Gemini, Reasonix, Antigravity)
+        import re
+        xml_tool_patterns = [
+            (r"<write_file\b|<file_write\b", "write_file"),
+            (r"<read_file\b|<file_read\b", "read_file"),
+            (r"<execute_bash\b|<bash\b|<shell_command\b", "execute_bash"),
+            (r"<str_replace_editor\b|<edit_file\b", "str_replace_editor"),
+        ]
+        for pattern, tool_name in xml_tool_patterns:
+            matches = len(re.findall(pattern, stdout, re.IGNORECASE))
+            if matches > 0 and tool_name not in counts:
+                counts[tool_name] += matches
+
+        # Named <tool_call>{"name": "xyz"}
+        for match in re.finditer(r'<tool_call>\s*\{\s*"name"\s*:\s*"([^"]+)"', stdout):
+            t_name = match.group(1)
+            counts[t_name] += 1
 
         return dict(counts)
 

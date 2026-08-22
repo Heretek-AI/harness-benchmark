@@ -43,31 +43,77 @@ class CoderEvalAdapter(JSONManifestBenchmark):
 
         stdout = result.stdout or ""
 
-        if "stdout_contains" in expected:
-            target = str(expected["stdout_contains"]).strip()
-            if target in stdout:
-                return True
+        # Rigorous Oracle Unit Test Assertions
+        if "test_asserts" in expected:
+            asserts = expected["test_asserts"].strip()
+            fn_name = expected.get("function_name")
 
-            # If the model emitted a Python code snippet without executing it,
-            # execute the code snippet to check if the logic satisfies the expected output.
+            # Gather candidate Python implementations from workspace files & stdout
+            candidates: list[str] = []
+
+            # 1. Any Python files created in workspace cwd
+            if cwd is not None and cwd.exists():
+                for py_file in cwd.glob("**/*.py"):
+                    try:
+                        content = py_file.read_text()
+                        if fn_name is None or f"def {fn_name}" in content:
+                            candidates.append(content)
+                    except Exception:
+                        pass
+
+            # 2. Markdown Python code blocks in stdout
             code_blocks = re.findall(r"```(?:python|py)?\s*([\s\S]*?)```", stdout)
-            for code in code_blocks:
-                code = code.strip()
-                if not code:
-                    continue
+            for block in code_blocks:
+                b = block.strip()
+                if b and (fn_name is None or f"def {fn_name}" in b):
+                    candidates.append(b)
+
+            # 3. XML file write content blocks (e.g. <content>...</content>)
+            xml_blocks = re.findall(r"<content>([\s\S]*?)</content>", stdout)
+            for block in xml_blocks:
+                b = block.strip()
+                if b and (fn_name is None or f"def {fn_name}" in b):
+                    candidates.append(b)
+
+            # 4. Raw stdout as fallback if it defines the function
+            if fn_name and f"def {fn_name}" in stdout:
+                candidates.append(stdout)
+
+            # Execute test assertions against each candidate implementation in an isolated subprocess
+            for code in candidates:
+                test_script = f"{code}\n\n{asserts}\n"
                 try:
                     proc = subprocess.run(
-                        [sys.executable, "-c", code],
+                        [sys.executable, "-c", test_script],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        cwd=cwd,
+                    )
+                    if proc.returncode == 0:
+                        return True
+                except (subprocess.TimeoutExpired, Exception):
+                    continue
+
+            return False
+
+        if "stdout_contains" in expected:
+            target = str(expected["stdout_contains"]).strip()
+            # If target in stdout, check if code runs correctly
+            code_blocks = re.findall(r"```(?:python|py)?\s*([\s\S]*?)```", stdout)
+            for code in code_blocks:
+                try:
+                    proc = subprocess.run(
+                        [sys.executable, "-c", code.strip()],
                         capture_output=True,
                         text=True,
                         timeout=5,
                     )
                     if proc.returncode == 0 and target in proc.stdout:
                         return True
-                except (subprocess.TimeoutExpired, Exception):
+                except Exception:
                     continue
-
-            return False
+            return target in stdout
 
         if "exit_code" in expected:
             return result.exit_code == expected["exit_code"]
