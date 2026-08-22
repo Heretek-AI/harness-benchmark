@@ -351,6 +351,20 @@ class BaseAgentAdapter(abc.ABC):
                 if isinstance(out, int):
                     total_out = out
 
+            # Gemini CLI stats.models.<model>.tokens
+            if isinstance(obj.get("stats"), dict):
+                models = obj["stats"].get("models", {})
+                if isinstance(models, dict):
+                    for m_info in models.values():
+                        if isinstance(m_info, dict) and isinstance(m_info.get("tokens"), dict):
+                            toks = m_info["tokens"]
+                            inp = toks.get("input") or toks.get("prompt")
+                            out = toks.get("candidates") or toks.get("output")
+                            if isinstance(inp, int):
+                                total_inp = (total_inp or 0) + inp
+                            if isinstance(out, int):
+                                total_out = (total_out or 0) + out
+
         return total_inp, total_out
 
     def count_tool_calls(self, stdout: str) -> dict[str, int]:

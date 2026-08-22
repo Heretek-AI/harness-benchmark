@@ -12,6 +12,7 @@ These lock in the contract that:
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import pytest
 
@@ -181,3 +182,25 @@ def test_base_grade_expected_default_requires_nonzero_expected(tmp_path: Path) -
     bad = ExecutionResult(harness="x", benchmark="", task_id="", exit_code=2, duration_seconds=0.0)
     assert bench.grade(ok, expected={"anything": 1}) is True
     assert bench.grade(bad, expected={"anything": 1}) is False
+
+
+def test_extract_token_usage_gemini_cli_stats() -> None:
+    adapter = GeminiCLIAdapter()
+    sample_stdout = json.dumps({
+        "session_id": "test-123",
+        "response": "Hello world",
+        "stats": {
+            "models": {
+                "gemini-2.5-pro": {
+                    "tokens": {
+                        "prompt": 500,
+                        "candidates": 120,
+                        "total": 620,
+                    }
+                }
+            }
+        }
+    })
+    inp, out = adapter.extract_token_usage(sample_stdout)
+    assert inp == 500
+    assert out == 120

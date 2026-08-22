@@ -129,7 +129,7 @@ class GeminiBridgeHandler(BaseHTTPRequestHandler):
                     headers=headers,
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=120) as resp:
+                with urllib.request.urlopen(req, timeout=20) as resp:
                     raw = resp.read().decode("utf-8")
                     data = json.loads(raw)
                     
