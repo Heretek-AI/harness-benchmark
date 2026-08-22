@@ -58,6 +58,7 @@ See the README's `## ⚙️ Prerequisites` section for example clone commands.
 |---|---|---|
 | `HARNESS_BENCH_FALLBACK_ENGINE` | When `1`, adapters whose CLI is missing on PATH delegate to the in-process `agent-engine` ReAct loop instead of failing. | unset (hard-fail) |
 | `HARNESS_BENCH_USE_BWRAP` | When `1`, every harness subprocess is wrapped in a bubblewrap sandbox (`--ro-bind /` + writable workspace + `--unshare-pid`). Falls back gracefully if `bwrap` is not on PATH. | unset (no sandbox) |
+| `HARNESS_BENCH_NETWORK_ISOLATION` | When `1` (with `HARNESS_BENCH_USE_BWRAP=1`), adds `--unshare-net` to isolate agent from host network. | unset (network accessible) |
 | `HARNESS_BENCH_MCP_REGISTRY` | Override path to `mcp/mcp_registry.json`. | `mcp/mcp_registry.json` |
 | `HARNESS_BENCH_PLUGIN_REGISTRY` | Override path to `plugins/registry.json`. | `plugins/registry.json` |
 | `HARNESS_BENCH_PRICING_JSON` | Override path to USD token pricing JSON for `metrics.cost_table`. | built-in default |
@@ -78,3 +79,27 @@ When running real benchmarks with Claude Code:
 - Python 3.11+ syntax with strict typing.
 - Always use `pydantic.BaseModel` for persistent serializable data schemas.
 - When adding new tests, place them under `tests/` and mirror existing module naming (`test_<module>.py`).
+
+---
+
+## 5. Harbor Task Standard
+
+Tasks are directories under `tasks/` with:
+- `instruction.md` — natural-language task description (required)
+- `test.sh` — shell verification script (required)
+- `Dockerfile` — environment specification (optional)
+- `verify_files.json` — file-state assertions (optional)
+- `oracle_solution.*` — reference solution (optional)
+
+Run Harbor tasks: `python run_benchmark.py --benchmark harbor --tasks-limit 5`
+
+## 6. Key Modules
+
+| Module | Purpose |
+|---|---|
+| `benchmarks/harbor_adapter.py` | Load and grade Harbor Task Standard directories |
+| `evaluation/constraint_checker.py` | Deterministic text constraint checking (regex, word counts, forbidden tokens) |
+| `evaluation/oracle.py` | Python assert injection, shell verify, file-state verification |
+| `metrics/telemetry.py` | Structured JSONL telemetry emitter (task_start, tool_use, token_usage, task_end) |
+| `evaluation/statistics.py` | McNemar test + bootstrap confidence intervals for A/B comparisons |
+| `evaluation/ablation_runner.py` | 5-tier deterministic ablation matrix (bare → LSP → skills → MCP → full stack) |
