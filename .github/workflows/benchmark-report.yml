@@ -38,10 +38,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ${{ github.workspace }}
         shell: python
         run: |
           import json
           import os
+          import sys
           from pathlib import Path
           from core.types import BenchmarkReport, CellSummary, MetricSummary, ExecutionResult
           from reporting.github_issue import GitHubIssuePublisher

@@ -1,0 +1,77 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+      - name: Lint with ruff
+        run: ruff check . --exit-non-zero-on-fix || true
+      - name: Run tests
+        run: python -m pytest -v --tb=short
+
+  smoke-benchmark:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Install bubblewrap
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bubblewrap || true
+      - name: Run smoke benchmark
+        run: |
+          python run_benchmark.py \
+            --preset smoke_test \
+            --output-format json \
+            --output-dir runs
+      - name: Validate output
+        run: |
+          python -c "
+          import json
+          from pathlib import Path
+          results = list(Path('runs').rglob('result.json'))
+          assert results, 'No result.json found'
+          data = json.loads(results[0].read_text())
+          assert 'summaries' in data, 'Missing summaries key'
+          assert data['summaries'], 'Empty summaries'
+          print(f'Smoke test OK: {len(data[\"summaries\"])} cell(s)')
+          "
+      - name: Upload smoke results
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-benchmark-results
+          path: runs/
+          retention-days: 7

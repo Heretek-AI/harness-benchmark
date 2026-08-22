@@ -60,7 +60,7 @@ dev = [
 harness-benchmark = "run_benchmark:main"
 
 [tool.setuptools.packages.find]
-include = ["agents*", "benchmarks*", "mcp*", "metrics*", "plugins*"]
+include = ["agents*", "benchmarks*", "core*", "evaluation*", "mcp*", "metrics*", "plugins*", "reporting*"]
 
 [tool.ruff]
 line-length = 120
