@@ -1,4 +1,4 @@
-# Claude Code Developer Guide: Harness Benchmark
+# Claude Code Developer Guide: Harness Benchmark 2.0
 
 This guide contains project context, architectural specifics, and workflow commands tailored for Anthropic's **Claude Code** CLI and related Anthropic assistant tooling.
 
@@ -14,16 +14,14 @@ pip install -r requirements.txt
 pytest -v
 
 # 3. Run a quick smoke benchmark (hermetic stub, no LLM keys needed)
-python run_benchmark.py --config configs/presets/smoke_test.yaml --harness stub --output-format markdown
+python run_benchmark.py --preset smoke_test --scorecard
 
-# 4. Run a Claude Code evaluation against coder_eval with an MCP server
+# 4. Run a 5-Tier Ablation evaluation with Scorecard & A/B Deltas
 python run_benchmark.py \
-  --harness claude-code \
-  --benchmark coder_eval \
-  --plugins none \
-  --mcp chrome-devtools-mcp,context7,repomix \
-  --tasks-limit 3 \
-  --output-format github-summary
+  --preset ablation_5tier \
+  --scorecard \
+  --ab-test \
+  --debug
 ```
 
 ---
@@ -33,6 +31,8 @@ python run_benchmark.py \
 The adapter is implemented in [`agents/claude_code_adapter.py`](agents/claude_code_adapter.py).
 
 ### Key Mechanics:
+- **5-Tier Deterministic Ablation**:
+  Supports evaluating `tier_0_bare`, `tier_1_lsp` (AST diagnostic loop), `tier_2_skills` (rule harnesses), `tier_3_mcp` (isolated tool servers), and `tier_4_full_stack` (all enabled).
 - **Dynamic MCP Injection**:
   When `mcp_servers` are requested, the adapter dynamically builds a `mcp-config.json` file in the staging directory and invokes Claude Code with `--mcp-config <path>`.
 - **Dynamic Plugin Mounting**:

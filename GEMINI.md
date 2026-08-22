@@ -1,4 +1,4 @@
-# Gemini CLI & Antigravity Developer Guide: Harness Benchmark
+# Gemini CLI & Antigravity Developer Guide: Harness Benchmark 2.0
 
 This guide contains operational instructions, configuration specifications, and workflow commands tailored for Google's **Gemini CLI** and **Antigravity** coding assistants.
 
@@ -14,16 +14,16 @@ pip install -r requirements.txt
 pytest -v
 
 # 3. Test Antigravity adapter with a synthetic smoke run
-python run_benchmark.py --harness stub --benchmark coder_eval --tasks-limit 1 --output-format markdown
+python run_benchmark.py --preset smoke_test --scorecard
 
-# 4. Run Gemini CLI benchmark sweep
+# 4. Run 5-Tier Ablation Benchmark for Gemini CLI & Antigravity
 python run_benchmark.py \
-  --harness gemini-cli \
-  --benchmark coder_eval \
-  --plugins none \
-  --mcp repomix \
-  --tasks-limit 2 \
-  --output-format json
+  --harness gemini-cli,antigravity-cli \
+  --benchmark coder_eval,terminal-bench \
+  --preset ablation_5tier \
+  --scorecard \
+  --ab-test \
+  --debug
 ```
 
 ---
@@ -35,6 +35,8 @@ python run_benchmark.py \
   Generates `.antigravity/config.json` inside the hermetic test workspace with endpoint and model parameters (`LLM_API`, `LLM_MODEL`).
 - **CLI Invocation**:
   Executes `antigravity run <prompt>` inside the isolated task directory with merged environment variables.
+- **5-Tier Ablation Support**:
+  Supports standalone baseline `tier_0_bare`, LSP diagnostic loop `tier_1_lsp`, custom rule extensions `tier_2_skills`, external MCP tools `tier_3_mcp`, and Full Stack `tier_4_full_stack`.
 
 ### Gemini CLI Adapter ([`agents/gemini_cli_adapter.py`](agents/gemini_cli_adapter.py))
 - **REST Translation Bridge**:
@@ -62,5 +64,6 @@ python run_benchmark.py \
 
 All run outputs are persisted to `./runs/<run-id>/`:
 - `result.json`: Full machine-readable benchmark report with pass rates, latency metrics, and costs.
-- `REPORT.md`: GitHub-Flavored Markdown summary table.
+- `REPORT.md`: GitHub-Flavored Markdown summary table with Leaderboards and A/B Deltas.
 - `<harness>__<benchmark>__<task>.jsonl`: Detailed per-task execution trace.
+- `badges/`: SVG status badges for repository displays.
