@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from core.types import AblationTier, ExecutionResult, FailureCategory
+from evaluation.composite_score import compute_composite
 
 
 @dataclass
@@ -72,6 +73,9 @@ class MetricCollector:
                 "passed_count": 0,
                 "failed_count": 0,
                 "pass_rate": None,
+                "pass_at_1": 0.0,
+                "pass_at_2": None,
+                "pass_at_3": None,
                 "latency_p50": None,
                 "latency_p95": None,
                 "latency_mean": None,
@@ -86,6 +90,8 @@ class MetricCollector:
                 "tool_calls_by_name": {},
                 "failure_breakdown": {},
                 "lsp_errors_resolved": 0,
+                "security_findings_total": 0,
+                "composite_score": None,
             }
 
         scored = [r for r in rows if r.passed is not None]
@@ -113,6 +119,8 @@ class MetricCollector:
         failure_counts: Counter[str] = Counter()
         lsp_resolved = sum(len(getattr(r, "lsp_diagnostics", [])) for r in rows)
 
+        security_findings_total = sum(len(getattr(r, "security_findings", []) or []) for r in rows)
+
         for r in rows:
             for name, n in r.tool_calls.items():
                 tool_counts[name] += n
@@ -127,12 +135,35 @@ class MetricCollector:
             bool(getattr(first_r, "lsp_enabled", False)),
         )
 
+        # Composite score: prefer the per-task (richer) computation;
+        # fall back to a summary-only estimate when results aren't held
+        # (callers that want the richer score can call
+        # ``MetricCollector.summarize_with_results(rows)`` directly).
+        try:
+            from core.types import MetricSummary as _MS
+
+            composite = compute_composite(
+                _MS(
+                    count=len(rows),
+                    passed_count=passed_count,
+                    failed_count=failed_count,
+                    pass_rate=pass_rate or 0.0,
+                    tokens_total=tokens_total,
+                ),
+                results=rows,
+            )
+        except Exception:
+            composite = None
+
         return {
             "tier": tier,
             "count": len(rows),
             "passed_count": passed_count,
             "failed_count": failed_count,
             "pass_rate": pass_rate,
+            "pass_at_1": pass_rate if pass_rate is not None else 0.0,
+            "pass_at_2": None,
+            "pass_at_3": None,
             "latency_p50": round(p50, 3),
             "latency_p95": round(p95, 3),
             "latency_mean": round(mean_lat, 3),
@@ -147,4 +178,6 @@ class MetricCollector:
             "tool_calls_by_name": dict(tool_counts.most_common()),
             "failure_breakdown": dict(failure_counts.most_common()),
             "lsp_errors_resolved": lsp_resolved,
+            "security_findings_total": security_findings_total,
+            "composite_score": composite,
         }

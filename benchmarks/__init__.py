@@ -2,11 +2,13 @@
 
 from benchmarks.base import BaseBenchmark, JSONManifestBenchmark, TaskSpec
 from benchmarks.coder_eval_adapter import CoderEvalAdapter
+from benchmarks.mcp_security_adapter import MCPSecurityAdapter
 from benchmarks.terminal_bench_adapter import TerminalBenchAdapter
 
 REGISTRY: dict[str, type[BaseBenchmark]] = {
     "coder_eval": CoderEvalAdapter,
     "terminal-bench": TerminalBenchAdapter,
+    "mcp-security": MCPSecurityAdapter,
 }
 
 
@@ -22,6 +24,7 @@ __all__ = [
     "BaseBenchmark",
     "CoderEvalAdapter",
     "JSONManifestBenchmark",
+    "MCPSecurityAdapter",
     "TaskSpec",
     "TerminalBenchAdapter",
     "resolve_benchmark",

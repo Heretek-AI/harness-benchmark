@@ -101,6 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks-limit", type=int, default=None)
     parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument(
+        "--repeat",
+        type=int,
+        default=None,
+        help="Run each task N times for pass^k consistency aggregation",
+    )
+    parser.add_argument(
         "--output-format",
         choices=["json", "markdown", "github-summary", "scorecard"],
         default=None,
@@ -164,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     timeout_seconds = args.timeout if args.timeout is not None else int(preset.get("timeout_seconds", 600) or 600)
     output_format = args.output_format if args.output_format is not None else str(preset.get("output_format", "json"))
     name = args.name if args.name is not None else str(preset.get("name") or "ad-hoc")
+    repeat_count = args.repeat if args.repeat is not None else int(preset.get("repeat_count", 1) or 1)
 
     config = RunConfig(
         name=name,
@@ -175,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout_seconds=timeout_seconds,
         output_format=output_format,
         output_dir=args.output_dir,
+        repeat_count=repeat_count,
     )
 
     plugin_registry, mcp_registry = _resolve_registry_paths(args)

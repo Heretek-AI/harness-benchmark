@@ -16,14 +16,18 @@ class ScorecardGenerator:
             "",
             f"**Run ID**: `{report.run_id}` | **Model**: `{report.config.get('llm_model', 'N/A')}`",
             "",
-            "| Rank | Harness | Benchmark | Plugins | MCP | Pass@1 | Latency p50 | Tokens (In/Out) | Tool Calls |",
-            "|:---:|:---|:---|:---|:---|:---:|:---:|:---:|:---:|",
+            "| Rank | Harness | Benchmark | Plugins | MCP | Pass@1 | Composite | Latency p50 | Tokens (In/Out) | Tool Calls |",
+            "|:---:|:---|:---|:---|:---|:---:|:---:|:---:|:---:|:---:|",
         ]
 
-        # Sort summaries by Pass@1 (descending), then Latency p50 (ascending)
+        # Sort summaries by Composite score (descending), then Pass@1, then latency.
         sorted_summaries = sorted(
             report.summaries,
-            key=lambda s: (s.summary.pass_rate, -s.summary.latency_p50),
+            key=lambda s: (
+                s.summary.composite_score if s.summary.composite_score is not None else -1.0,
+                s.summary.pass_rate,
+                -s.summary.latency_p50,
+            ),
             reverse=True,
         )
 
@@ -32,11 +36,12 @@ class ScorecardGenerator:
             p_str = ",".join(s.plugins) if s.plugins else "none"
             m_str = ",".join(s.mcp_servers) if s.mcp_servers else "none"
             toks_str = f"{sum_d.tokens_input_total:,} / {sum_d.tokens_output_total:,}"
+            composite_str = f"**{sum_d.composite_score * 100:.1f}**" if sum_d.composite_score is not None else "—"
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
 
             lines.append(
                 f"| {medal} | **`{s.harness}`** | `{s.benchmark}` | `{p_str}` | `{m_str}` | "
-                f"**{sum_d.pass_rate * 100:.1f}%** | {sum_d.latency_p50:.2f}s | {toks_str} | {sum_d.tool_calls_total} |"
+                f"**{sum_d.pass_rate * 100:.1f}%** | {composite_str} | {sum_d.latency_p50:.2f}s | {toks_str} | {sum_d.tool_calls_total} |"
             )
 
         return "\n".join(lines)

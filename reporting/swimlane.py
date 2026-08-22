@@ -44,3 +44,71 @@ class InteractionSwimlane:
         lines.append(f"└{'─' * 68}┘")
         lines.append("```")
         return "\n".join(lines)
+
+    @staticmethod
+    def render_divergence_diagram(result_a: ExecutionResult, result_b: ExecutionResult) -> str:
+        """Render a side-by-side divergence diagram for two execution results.
+
+        Highlights the steps where the two harnesses diverged:
+        - tool-call name disagreements
+        - missing tools in one trajectory
+        - pass/fail divergence
+        - token-cost divergence
+
+        Falls back gracefully when one trajectory is empty.
+        """
+        lines = ["```text"]
+        lines.append("┌─────────────────────────────────────────┬─────────────────────────────────────────┐")
+        lines.append(f"│ RUN A: {result_a.harness:<33}│ RUN B: {result_b.harness:<33}│")
+        lines.append(f"│ task_id: {result_a.task_id:<30}│ task_id: {result_b.task_id:<30}│")
+        lines.append("├─────────────────────────────────────────┼─────────────────────────────────────────┤")
+
+        def _turns(result: ExecutionResult) -> list[tuple[str, str]]:
+            """Flatten turns into (label, content) pairs."""
+            flat: list[tuple[str, str]] = []
+            for idx, turn in enumerate(result.turns, 1):
+                flat.append((f"turn {idx}", f"LLM {turn.tokens_input}/{turn.tokens_output}"))
+                for tool in turn.tool_calls:
+                    flat.append((f"tool {tool.name}", f"exit={tool.exit_code or 0}"))
+            if not flat:
+                # Fall back to stdout tool-call counting when turns
+                # are unavailable.
+                for name, count in result.tool_calls.items():
+                    flat.append((f"tool {name}", f"count={count}"))
+                if not flat:
+                    flat.append(("<empty>", ""))
+            return flat
+
+        a_flat = _turns(result_a)
+        b_flat = _turns(result_b)
+        max_len = max(len(a_flat), len(b_flat))
+        for i in range(max_len):
+            a_label, a_body = a_flat[i] if i < len(a_flat) else ("", "")
+            b_label, b_body = b_flat[i] if i < len(b_flat) else ("", "")
+            a_line = f"{a_label:<13} {a_body:<26}"
+            b_line = f"{b_label:<13} {b_body:<26}"
+            div = ""
+            if (i < len(a_flat)) != (i < len(b_flat)):
+                div = "  ← missing step"
+            elif a_label != b_label:
+                div = f"  ← DIV: {a_label!r} vs {b_label!r}"
+            lines.append(f"│ {a_line[:39]:<39} │ {b_line[:39]:<39} │{div}")
+
+        # Token-cost divergence row.
+        a_tok = result_a.tokens_total or 0
+        b_tok = result_b.tokens_total or 0
+        cost_div = ""
+        if a_tok != b_tok:
+            delta = b_tok - a_tok
+            cost_div = f"  ← DIV: Δ {(delta):+d} tokens"
+        lines.append("├─────────────────────────────────────────┼─────────────────────────────────────────┤")
+        lines.append(f"│ tokens: {a_tok:<30}│ tokens: {b_tok:<30}│{cost_div}")
+
+        # Pass/fail divergence.
+        a_pass = "✅ PASS" if result_a.passed else f"❌ FAIL ({result_a.failure_category})"
+        b_pass = "✅ PASS" if result_b.passed else f"❌ FAIL ({result_b.failure_category})"
+        pass_div = "  ← DIV: outcomes disagree" if result_a.passed != result_b.passed else ""
+        lines.append(f"│ outcome: {a_pass:<29}│ outcome: {b_pass:<29}│{pass_div}")
+        lines.append("└─────────────────────────────────────────┴─────────────────────────────────────────┘")
+        lines.append("```")
+        return "\n".join(lines)

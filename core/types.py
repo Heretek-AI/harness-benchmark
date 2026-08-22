@@ -44,6 +44,27 @@ class TaskSpec(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SecurityFinding(BaseModel):
+    """A single security-property test outcome from the MCPSEC suite.
+
+    ``passed=True`` means the harness correctly handled the attack
+    surface (refused the unauthorized action, sanitized the injection,
+    etc.). ``severity`` is the OWASP criticality when the property
+    failed: ``critical`` for direct compromise vectors, ``high`` for
+    privilege escalation, ``medium`` for information disclosure,
+    ``low`` for observability/telemetry gaps.
+    """
+
+    property_id: str
+    property_name: str
+    attack_class: str
+    owasp_ref: str
+    passed: bool
+    severity: str = "info"
+    evidence: str = ""
+    task_id: str | None = None
+
+
 class ToolCall(BaseModel):
     """Structured record of a single tool invocation."""
 
@@ -79,6 +100,8 @@ class ExecutionResult(BaseModel):
     plugins_loaded: list[str] = Field(default_factory=list)
     mcp_loaded: list[str] = Field(default_factory=list)
     lsp_enabled: bool = False
+    repeat_index: int = 0
+    pass_vector_key: str | None = None  # when --repeat N > 1, identifies the same task across runs
     exit_code: int
     duration_seconds: float
     stdout: str = ""
@@ -95,6 +118,7 @@ class ExecutionResult(BaseModel):
     error: str | None = None
     oracle_log: str | None = None
     lsp_diagnostics: list[str] = Field(default_factory=list)
+    security_findings: list[SecurityFinding] = Field(default_factory=list)
     turns: list[AgentTurn] = Field(default_factory=list)
 
 
@@ -106,6 +130,9 @@ class MetricSummary(BaseModel):
     passed_count: int = 0
     failed_count: int = 0
     pass_rate: float = 0.0
+    pass_at_1: float = 0.0
+    pass_at_2: float | None = None
+    pass_at_3: float | None = None
     latency_p50: float = 0.0
     latency_p95: float = 0.0
     latency_mean: float = 0.0
@@ -120,6 +147,8 @@ class MetricSummary(BaseModel):
     cost_usd_total: float = 0.0
     failure_breakdown: dict[str, int] = Field(default_factory=dict)
     lsp_errors_resolved: int = 0
+    security_findings_total: int = 0
+    composite_score: float | None = None
 
 
 class CellSummary(BaseModel):
@@ -154,6 +183,14 @@ class ABComparisonResult(BaseModel):
     treatment_tool_calls: int
     delta_tool_calls_pct: float
     narrative_verdict: str
+    # Statistical significance (Phase A)
+    mcnemar_chi2: float | None = None
+    mcnemar_p_value: float | None = None
+    wilcoxon_w: float | None = None
+    wilcoxon_p_value: float | None = None
+    bootstrap_ci_lower: float | None = None
+    bootstrap_ci_upper: float | None = None
+    bootstrap_target: str = "pass_rate"  # "pass_rate" | "latency_p50" | "tokens_total"
 
 
 class TierDelta(BaseModel):

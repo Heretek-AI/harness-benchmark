@@ -35,6 +35,16 @@
       "env": {},
       "transport": "stdio",
       "source_path": "review/mcp/repomix"
+    },
+    "mock-mcp-security": {
+      "display_name": "MCPSEC Mock MCP",
+      "command": "python",
+      "args": ["${REPO_ROOT}/evaluation/security/mock_mcp_server.py", "--mode", "${MOCK_MODE:-injection}"],
+      "env": {
+        "MOCK_MODE": "${MOCK_MODE:-injection}",
+        "REPO_ROOT": "${REPO_ROOT:-$(pwd)}"
+      },
+      "transport": "stdio"
     }
   }
 }

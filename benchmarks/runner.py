@@ -57,6 +57,7 @@ class RunConfig:
     lsp_enabled: bool = False
     skills_plugin: str = "caveman"
     mcp_for_ablation: str = "repomix"
+    repeat_count: int = 1  # Number of times to execute each task (Phase C: pass^k)
 
 
 @dataclass
@@ -139,13 +140,33 @@ class BenchmarkRunner:
             self.metric_collector.reset()
             for r in cell_results:
                 self.metric_collector.record(r, benchmark=benchmark)
+            summary = self.metric_collector.summarize()
+
+            # Phase C: pass^k aggregation. If repeat_count > 1,
+            # compute pass^2 and pass^3 over the per-task pass
+            # vectors and stamp them on the summary dict so the
+            # report can render them.
+            if getattr(self.config, "repeat_count", 1) > 1:
+                from evaluation.statistics import pass_at_k
+
+                by_task: dict[str, list[bool]] = {}
+                for r in cell_results:
+                    if r.passed is None:
+                        continue
+                    key = r.pass_vector_key or r.task_id
+                    by_task.setdefault(key, []).append(bool(r.passed))
+                max_repeats = max((len(v) for v in by_task.values()), default=0)
+                for k in (2, 3):
+                    if max_repeats >= k:
+                        summary[f"pass_at_{k}"] = pass_at_k(list(by_task.values()), k=k)
+
             report.metric_summaries.append(
                 {
                     "harness": harness,
                     "benchmark": benchmark,
                     "plugins": plugins,
                     "mcp_servers": mcp_servers,
-                    "summary": self.metric_collector.summarize(),
+                    "summary": summary,
                 }
             )
 
@@ -205,44 +226,52 @@ class BenchmarkRunner:
                     cwd = cwd / task.workspace_subdir
                     cwd.mkdir(parents=True, exist_ok=True)
                 benchmark.pre_setup(cwd)
-                bench_logger.task_start(task.task_id, task.prompt)
-                result, lsp_diags = run_lsp_iteration_loop(
-                    adapter=adapter,
-                    prompt=task.prompt,
-                    workspace_dir=cwd,
-                    timeout=self.config.timeout_seconds,
-                    lsp_enabled=lsp_enabled,
-                )
-                result.benchmark = benchmark_name
-                result.task_id = task.task_id
-                result.plugins = list(plugins)
-                result.mcp_servers = list(mcp_servers)
-                result.lsp_enabled = bool(lsp_enabled)
-                if lsp_diags:
-                    result.lsp_diagnostics = list(lsp_diags)
-                result.passed = benchmark.grade(result, task.expected, cwd=cwd)
-                if (
-                    result.tokens_input is not None or result.tokens_output is not None
-                ) and result.tokens_total is None:
-                    result.tokens_total = (result.tokens_input or 0) + (result.tokens_output or 0)
-                if result.tokens_total is not None and result.cost_usd is None:
-                    result.cost_usd = BaseAgentAdapter.estimate_cost(
-                        os.environ.get("LLM_MODEL", ""),
-                        result.tokens_input or 0,
-                        result.tokens_output or 0,
+                # Phase C: pass^k — run each task N times. The
+                # ``repeat_index`` on each result identifies which run
+                # produced it; ``pass_vector_key`` groups runs of the
+                # same task together so post-hoc aggregation works.
+                repeat_count = max(1, int(getattr(self.config, "repeat_count", 1) or 1))
+                for repeat_idx in range(repeat_count):
+                    bench_logger.task_start(task.task_id, task.prompt)
+                    result, lsp_diags = run_lsp_iteration_loop(
+                        adapter=adapter,
+                        prompt=task.prompt,
+                        workspace_dir=cwd,
+                        timeout=self.config.timeout_seconds,
+                        lsp_enabled=lsp_enabled,
                     )
-                results.append(result)
-                bench_logger.task_finish(
-                    task.task_id,
-                    bool(result.passed),
-                    result.duration_seconds,
-                    result.tokens_input,
-                    result.tokens_output,
-                    sum(result.tool_calls.values()),
-                )
-                # Per-task JSONL artifact for downstream drill-down.
-                with (run_dir / f"{harness_name}__{benchmark_name}__{task.task_id}.jsonl").open("a") as f:
-                    f.write(result.model_dump_json() + "\n")
+                    result.benchmark = benchmark_name
+                    result.task_id = task.task_id
+                    result.plugins = list(plugins)
+                    result.mcp_servers = list(mcp_servers)
+                    result.lsp_enabled = bool(lsp_enabled)
+                    result.repeat_index = repeat_idx
+                    result.pass_vector_key = f"{harness_name}__{benchmark_name}__{task.task_id}"
+                    if lsp_diags:
+                        result.lsp_diagnostics = list(lsp_diags)
+                    result.passed = benchmark.grade(result, task.expected, cwd=cwd)
+                    if (
+                        result.tokens_input is not None or result.tokens_output is not None
+                    ) and result.tokens_total is None:
+                        result.tokens_total = (result.tokens_input or 0) + (result.tokens_output or 0)
+                    if result.tokens_total is not None and result.cost_usd is None:
+                        result.cost_usd = BaseAgentAdapter.estimate_cost(
+                            os.environ.get("LLM_MODEL", ""),
+                            result.tokens_input or 0,
+                            result.tokens_output or 0,
+                        )
+                    results.append(result)
+                    bench_logger.task_finish(
+                        task.task_id,
+                        bool(result.passed),
+                        result.duration_seconds,
+                        result.tokens_input,
+                        result.tokens_output,
+                        sum(result.tool_calls.values()),
+                    )
+                    # Per-task JSONL artifact for downstream drill-down.
+                    with (run_dir / f"{harness_name}__{benchmark_name}__{task.task_id}.jsonl").open("a") as f:
+                        f.write(result.model_dump_json() + "\n")
         finally:
             try:
                 adapter.teardown()
