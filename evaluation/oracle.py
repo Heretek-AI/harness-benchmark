@@ -107,3 +107,56 @@ class OracleEvaluator:
             return False, f"Verification command timed out after {timeout}s: {verify_cmd}"
         except Exception as e:
             return False, f"Verification command execution exception: {e}"
+
+    @staticmethod
+    def evaluate_file_state(
+        verify_specs: list[dict],
+        cwd: Path | None = None,
+    ) -> tuple[bool, str]:
+        """Check file-system state assertions against the workspace.
+
+        Each spec in ``verify_specs`` is a dict with:
+            path: str         — relative path from workspace root
+            exists: bool      — file must exist (default True)
+            contains: str     — file must contain this string (optional)
+            not_contains: str — file must NOT contain this string (optional)
+            min_lines: int    — minimum line count (optional)
+
+        Returns (passed, message).
+        """
+        if cwd is None or not cwd.exists():
+            return False, "No workspace directory for file-state verification"
+
+        violations: list[str] = []
+        for spec in verify_specs:
+            rel_path = spec.get("path", "")
+            file_path = cwd / rel_path
+
+            if spec.get("exists", True) and not file_path.exists():
+                violations.append(f"{rel_path}: does not exist")
+                continue
+
+            if not spec.get("exists", True) and file_path.exists():
+                violations.append(f"{rel_path}: should not exist but does")
+                continue
+
+            if file_path.exists():
+                content = file_path.read_text(errors="replace")
+
+                contains = spec.get("contains")
+                if contains and contains not in content:
+                    violations.append(f"{rel_path}: does not contain {contains!r}")
+
+                not_contains = spec.get("not_contains")
+                if not_contains and not_contains in content:
+                    violations.append(f"{rel_path}: contains forbidden {not_contains!r}")
+
+                min_lines = spec.get("min_lines")
+                if min_lines is not None:
+                    actual = len(content.splitlines())
+                    if actual < min_lines:
+                        violations.append(f"{rel_path}: has {actual} lines, need >= {min_lines}")
+
+        if violations:
+            return False, "File-state violations: " + "; ".join(violations)
+        return True, "All file-state checks passed"

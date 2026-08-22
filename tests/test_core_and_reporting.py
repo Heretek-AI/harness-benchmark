@@ -203,3 +203,43 @@ def test_scorecard_and_github_issue_publishing(tmp_path: Path) -> None:
     export_junit_xml(report.results, junit_file, suite_name=report.run_id)
     assert junit_file.exists()
     assert '<testcase name="ce-py-001"' in junit_file.read_text()
+
+
+def test_oracle_file_state_pass(tmp_path: Path) -> None:
+    (tmp_path / "output.txt").write_text("hello world\nline 2\nline 3\n")
+    specs = [
+        {"path": "output.txt", "exists": True, "contains": "hello", "min_lines": 2},
+    ]
+    passed, msg = OracleEvaluator.evaluate_file_state(specs, cwd=tmp_path)
+    assert passed is True
+    assert "passed" in msg.lower()
+
+
+def test_oracle_file_state_fail_missing_file(tmp_path: Path) -> None:
+    specs = [{"path": "missing.txt", "exists": True}]
+    passed, msg = OracleEvaluator.evaluate_file_state(specs, cwd=tmp_path)
+    assert passed is False
+    assert "does not exist" in msg
+
+
+def test_oracle_file_state_fail_contains(tmp_path: Path) -> None:
+    (tmp_path / "out.txt").write_text("clean output")
+    specs = [{"path": "out.txt", "exists": True, "contains": "ERROR"}]
+    passed, msg = OracleEvaluator.evaluate_file_state(specs, cwd=tmp_path)
+    assert passed is False
+    assert "does not contain" in msg
+
+
+def test_oracle_file_state_fail_not_contains(tmp_path: Path) -> None:
+    (tmp_path / "out.txt").write_text("has a TODO item")
+    specs = [{"path": "out.txt", "exists": True, "not_contains": "TODO"}]
+    passed, msg = OracleEvaluator.evaluate_file_state(specs, cwd=tmp_path)
+    assert passed is False
+    assert "forbidden" in msg
+
+
+def test_oracle_file_state_no_cwd() -> None:
+    specs = [{"path": "x.txt", "exists": True}]
+    passed, msg = OracleEvaluator.evaluate_file_state(specs, cwd=None)
+    assert passed is False
+    assert "No workspace" in msg
