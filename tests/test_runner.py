@@ -109,3 +109,53 @@ def test_cli_main_invocation(tmp_path: Path) -> None:
     run_dirs = list((tmp_path / "cli_runs").iterdir())
     assert len(run_dirs) == 1
     assert (run_dirs[0] / "result.json").exists()
+
+
+def test_cli_main_junit_and_score_floor(tmp_path: Path) -> None:
+    from run_benchmark import main
+
+    junit_file = tmp_path / "test_junit.xml"
+    rc = main(
+        [
+            "--harness",
+            "stub",
+            "--benchmark",
+            "coder_eval",
+            "--plugins",
+            "none",
+            "--mcp",
+            "none",
+            "--tasks-limit",
+            "1",
+            "--junit-xml",
+            str(junit_file),
+            "--minimum-task-score",
+            "0.0",
+            "--output-dir",
+            str(tmp_path / "cli_runs_junit"),
+        ]
+    )
+    assert rc == 0
+    assert junit_file.exists()
+    assert "<testsuite" in junit_file.read_text()
+
+    # Test failure when floor is above stub's pass rate (0.0 < 0.5)
+    rc_fail = main(
+        [
+            "--harness",
+            "stub",
+            "--benchmark",
+            "coder_eval",
+            "--plugins",
+            "none",
+            "--mcp",
+            "none",
+            "--tasks-limit",
+            "1",
+            "--minimum-task-score",
+            "0.5",
+            "--output-dir",
+            str(tmp_path / "cli_runs_fail"),
+        ]
+    )
+    assert rc_fail == 1

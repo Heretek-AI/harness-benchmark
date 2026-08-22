@@ -102,6 +102,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", type=Path, default=Path("runs"))
     parser.add_argument(
+        "--junit-xml",
+        type=Path,
+        default=None,
+        help="Path to export JUnit XML report",
+    )
+    parser.add_argument(
+        "--minimum-task-score",
+        type=float,
+        default=None,
+        help="Strict floor (0.0 - 1.0) for cell pass-rate. Fails with exit code 1 if below floor.",
+    )
+    parser.add_argument(
         "--name", default=None, help="Run name; becomes the run-id prefix."
     )
     parser.add_argument(
@@ -180,6 +192,10 @@ def main(argv: list[str] | None = None) -> int:
     runner = BenchmarkRunner(config, plugin_loader, mcp_launcher)
     report = runner.run()
 
+    if args.junit_xml:
+        from metrics.junit_exporter import export_junit_xml
+        export_junit_xml(report.results, args.junit_xml, suite_name=report.config.name)
+
     # Also print to stdout for ad-hoc local debugging; the per-run files
     # are the durable artefacts.
     if output_format == "json":
@@ -188,6 +204,18 @@ def main(argv: list[str] | None = None) -> int:
         print(render_markdown(report))
     elif output_format == "github-summary":
         print(render_github_summary(report))
+
+    if args.minimum_task_score is not None:
+        floor = float(args.minimum_task_score)
+        failed_cells = []
+        for cell in report.metric_summaries:
+            rate = cell.get("summary", {}).get("pass_rate", 0.0)
+            if rate < floor:
+                failed_cells.append((cell.get("harness"), cell.get("benchmark"), rate))
+        if failed_cells:
+            for h, b, r in failed_cells:
+                print(f"::error::Score floor failed for {h} on {b}: {r*100:.1f}% < {floor*100:.1f}%", file=sys.stderr)
+            return 1
 
     return 0
 

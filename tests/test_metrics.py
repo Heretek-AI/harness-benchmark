@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agents.base import ExecutionResult
 from metrics import MetricCollector, render_markdown
 
@@ -56,3 +58,19 @@ def test_render_markdown_contains_table_rows() -> None:
     assert "| Harness | Benchmark |" in md
     assert "stub" in md
     assert "coder_eval" in md
+
+
+def test_export_junit_xml(tmp_path: Path) -> None:
+    from metrics.junit_exporter import export_junit_xml
+    results = [
+        _r(True, 0.1),
+        _r(False, 0.2),
+    ]
+    xml_file = tmp_path / "junit.xml"
+    export_junit_xml(results, xml_file, suite_name="test-suite")
+    assert xml_file.exists()
+    content = xml_file.read_text()
+    assert '<testsuite name="test-suite" tests="2" failures="1"' in content
+    assert '<testcase name="t-0.1"' in content
+    assert '<testcase name="t-0.2"' in content
+    assert '<failure message=' in content

@@ -1,0 +1,154 @@
+name: "Harness Benchmark"
+author: "Heretek-AI"
+description: "Matrix evaluation framework for AI coding harnesses, MCP servers, and plugin extensions."
+branding:
+  icon: "cpu"
+  color: "blue"
+
+inputs:
+  harness:
+    description: "Comma-separated harness names or 'all' (claude-code, opencode, DeepSeek-Reasonix, gemini-cli, deepseek-harness, antigravity-cli, stub)"
+    required: false
+    default: "all"
+  benchmark:
+    description: "Benchmark suites to run (coder_eval, terminal-bench, or 'all')"
+    required: false
+    default: "all"
+  plugins:
+    description: "Comma-separated plugin names or 'none'"
+    required: false
+    default: "none"
+  mcp:
+    description: "Comma-separated MCP server names or 'none'"
+    required: false
+    default: "none"
+  tasks-limit:
+    description: "Max tasks per matrix cell (0 = run all tasks)"
+    required: false
+    default: "5"
+  timeout:
+    description: "Execution timeout in seconds per task"
+    required: false
+    default: "600"
+  llm-api:
+    description: "Target LLM base URL (LiteLLM, OpenAI proxy, or Anthropic proxy)"
+    required: false
+    default: ""
+  llm-key:
+    description: "Target LLM API authentication key"
+    required: false
+    default: ""
+  llm-model:
+    description: "Unified model identifier (e.g. claude-sonnet-4, MiniMax-M3, gpt-4o)"
+    required: false
+    default: ""
+  run-dir:
+    description: "Directory where run artifacts are written"
+    required: false
+    default: "runs"
+  junit-path:
+    description: "Where to export the JUnit XML report (empty to disable)"
+    required: false
+    default: "benchmark-junit.xml"
+  step-summary:
+    description: "Append Markdown benchmark table to GitHub Job Summary ('true'/'false')"
+    required: false
+    default: "true"
+  minimum-task-score:
+    description: "Optional pass-rate floor (0.0 to 1.0) to enforce strict CI gates"
+    required: false
+    default: ""
+  env:
+    description: >-
+      Newline-separated NAME=VALUE pairs exported for the benchmark runner child process only.
+    required: false
+    default: ""
+
+outputs:
+  run-dir:
+    description: "The directory containing result.json and run reports"
+    value: ${{ steps.run.outputs.run-dir }}
+  junit-path:
+    description: "Path to the written JUnit XML test report"
+    value: ${{ steps.run.outputs.junit-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r "${{ github.action_path }}/requirements.txt"
+
+    - name: Run benchmark matrix
+      id: run
+      shell: bash
+      env:
+        HB_HARNESS: ${{ inputs.harness }}
+        HB_BENCHMARK: ${{ inputs.benchmark }}
+        HB_PLUGINS: ${{ inputs.plugins }}
+        HB_MCP: ${{ inputs.mcp }}
+        HB_TASKS_LIMIT: ${{ inputs.tasks-limit }}
+        HB_TIMEOUT: ${{ inputs.timeout }}
+        HB_LLM_API: ${{ inputs.llm-api }}
+        HB_LLM_KEY: ${{ inputs.llm-key }}
+        HB_LLM_MODEL: ${{ inputs.llm-model }}
+        HB_RUN_DIR: ${{ inputs.run-dir }}
+        HB_JUNIT: ${{ inputs.junit-path }}
+        HB_SUMMARY: ${{ inputs.step-summary }}
+        HB_MIN_SCORE: ${{ inputs.minimum-task-score }}
+        HB_ENV: ${{ inputs.env }}
+        HB_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -uo pipefail
+
+        # Scoped env passthrough
+        if [ -n "$HB_ENV" ]; then
+          while IFS= read -r line; do
+            line="${line%$'\r'}"
+            line="${line#"${line%%[![:space:]]*}"}"
+            [ -z "$line" ] && continue
+            case "$line" in '#'*) continue ;; esac
+            if [ "$line" = "${line#*=}" ]; then
+              echo "::error::env entry is not NAME=VALUE (no '=' found)"
+              exit 1
+            fi
+            name="${line%%=*}"
+            export "$name=${line#*=}"
+          done <<< "$HB_ENV"
+        fi
+
+        [ -n "$HB_LLM_API" ] && export LLM_API="$HB_LLM_API"
+        [ -n "$HB_LLM_KEY" ] && export LLM_KEY="$HB_LLM_KEY"
+        [ -n "$HB_LLM_MODEL" ] && export LLM_MODEL="$HB_LLM_MODEL"
+
+        args=(
+          python "${HB_ACTION_PATH}/run_benchmark.py"
+          --harness "$HB_HARNESS"
+          --benchmark "$HB_BENCHMARK"
+          --plugins "$HB_PLUGINS"
+          --mcp "$HB_MCP"
+          --tasks-limit "$HB_TASKS_LIMIT"
+          --timeout "$HB_TIMEOUT"
+          --output-dir "$HB_RUN_DIR"
+          --output-format "${HB_SUMMARY == 'true' && 'github-summary' || 'json'}"
+        )
+
+        [ -n "$HB_JUNIT" ] && args+=(--junit-xml "$HB_JUNIT")
+        [ -n "$HB_MIN_SCORE" ] && args+=(--minimum-task-score "$HB_MIN_SCORE")
+
+        set +e
+        "${args[@]}"
+        EXIT_CODE=$?
+        set -e
+
+        echo "run-dir=$HB_RUN_DIR" >> "$GITHUB_OUTPUT"
+        [ -n "$HB_JUNIT" ] && echo "junit-path=$HB_JUNIT" >> "$GITHUB_OUTPUT"
+
+        exit $EXIT_CODE
