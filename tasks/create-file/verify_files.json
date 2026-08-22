@@ -1,0 +1,3 @@
+[
+  {"path": "greeting.txt", "exists": true, "contains": "Hello, World!"}
+]
