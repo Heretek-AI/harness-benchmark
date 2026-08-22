@@ -95,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument(
         "--output-format",
-        choices=["json", "markdown", "github-summary"],
+        choices=["json", "markdown", "github-summary", "scorecard"],
         default=None,
     )
     parser.add_argument("--output-dir", type=Path, default=Path("runs"))
@@ -111,9 +111,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Strict floor (0.0 - 1.0) for cell pass-rate. Fails with exit code 1 if below floor.",
     )
+    parser.add_argument("--ab-test", action="store_true", help="Enable A/B comparative evaluation")
+    parser.add_argument("--scorecard", action="store_true", help="Render human-centric model scorecard")
+    parser.add_argument("--publish-issue", action="store_true", help="Publish report to date-labeled GitHub issue")
     parser.add_argument("--name", default=None, help="Run name; becomes the run-id prefix.")
     parser.add_argument("--plugin-registry", type=Path, help="Override plugins/registry.json path")
     parser.add_argument("--mcp-registry", type=Path, help="Override mcp/mcp_registry.json path")
+    parser.add_argument("--debug", action="store_true", help="Enable rich turn-by-turn debug execution logs")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 
@@ -165,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     plugin_loader = PluginLoader(plugin_registry)
     mcp_launcher = MCPLauncher(mcp_registry)
 
+    if args.debug:
+        from core.logger import logger as bench_logger
+
+        bench_logger.debug_mode = True
+
     runner = BenchmarkRunner(config, plugin_loader, mcp_launcher)
     report = runner.run()
 
@@ -173,14 +182,65 @@ def main(argv: list[str] | None = None) -> int:
 
         export_junit_xml(report.results, args.junit_xml, suite_name=report.config.name)
 
-    # Also print to stdout for ad-hoc local debugging; the per-run files
-    # are the durable artefacts.
-    if output_format == "json":
+    # Convert to Core BenchmarkReport for modern reporting subsystems
+    from core.types import BenchmarkReport as CoreReport
+    from core.types import CellSummary as CoreCellSummary
+    from core.types import MetricSummary as CoreMetricSummary
+
+    core_report = CoreReport(
+        run_id=report.run_id,
+        name=report.config.name,
+        started_at=report.started_at,
+        finished_at=report.finished_at,
+        config=report.to_dict().get("config", {}),
+        summaries=[
+            CoreCellSummary(
+                harness=s["harness"],
+                benchmark=s["benchmark"],
+                plugins=s["plugins"],
+                mcp_servers=s["mcp_servers"],
+                summary=CoreMetricSummary(**s["summary"]),
+            )
+            for s in report.metric_summaries
+        ],
+        results=report.results,
+    )
+
+    if args.scorecard or output_format == "scorecard":
+        from reporting.scorecard import ScorecardGenerator
+
+        print(ScorecardGenerator.render_markdown_leaderboard(core_report))
+        print()
+        print(ScorecardGenerator.render_task_drilldown_table(core_report))
+    elif output_format == "json":
         print(render_json(report))
     elif output_format == "markdown":
         print(render_markdown(report))
     elif output_format == "github-summary":
         print(render_github_summary(report))
+
+    if args.ab_test:
+        from reporting.ab_comparator import ABComparator
+
+        baselines = [s for s in core_report.summaries if not s.plugins and not s.mcp_servers]
+        treatments = [s for s in core_report.summaries if s.plugins or s.mcp_servers]
+        ab_diffs = []
+        for b in baselines:
+            for t in treatments:
+                if b.harness == t.harness and b.benchmark == t.benchmark:
+                    ab_diffs.append(ABComparator.compare_cells(b, t))
+        if ab_diffs:
+            print()
+            print(ABComparator.render_ab_markdown_table(ab_diffs))
+
+    if args.publish_issue:
+        from reporting.github_issue import GitHubIssuePublisher
+
+        issue_url = GitHubIssuePublisher.publish_issue(core_report)
+        if issue_url:
+            print(f"::notice::Published benchmark report to GitHub Issue: {issue_url}")
+        else:
+            print("::warning::Could not publish GitHub Issue (check gh auth status)")
 
     if args.minimum_task_score is not None:
         floor = float(args.minimum_task_score)

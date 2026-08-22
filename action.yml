@@ -58,6 +58,14 @@ inputs:
     description: "Optional pass-rate floor (0.0 to 1.0) to enforce strict CI gates"
     required: false
     default: ""
+  ab-test:
+    description: "Enable A/B comparative evaluation ('true'/'false')"
+    required: false
+    default: "false"
+  publish-issue:
+    description: "Publish date-labeled benchmark report to GitHub Issues ('true'/'false')"
+    required: false
+    default: "false"
   env:
     description: >-
       Newline-separated NAME=VALUE pairs exported for the benchmark runner child process only.
@@ -103,6 +111,8 @@ runs:
         HB_JUNIT: ${{ inputs.junit-path }}
         HB_SUMMARY: ${{ inputs.step-summary }}
         HB_MIN_SCORE: ${{ inputs.minimum-task-score }}
+        HB_AB_TEST: ${{ inputs.ab-test }}
+        HB_PUBLISH_ISSUE: ${{ inputs.publish-issue }}
         HB_ENV: ${{ inputs.env }}
         HB_ACTION_PATH: ${{ github.action_path }}
       run: |
@@ -142,6 +152,8 @@ runs:
 
         [ -n "$HB_JUNIT" ] && args+=(--junit-xml "$HB_JUNIT")
         [ -n "$HB_MIN_SCORE" ] && args+=(--minimum-task-score "$HB_MIN_SCORE")
+        [ "$HB_AB_TEST" = "true" ] && args+=(--ab-test)
+        [ "$HB_PUBLISH_ISSUE" = "true" ] && args+=(--publish-issue)
 
         set +e
         "${args[@]}"

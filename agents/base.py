@@ -22,34 +22,9 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from core.types import ExecutionResult
 
 logger = logging.getLogger(__name__)
-
-
-class ExecutionResult(BaseModel):
-    """Captured outcome of a single harness invocation.
-
-    The runner serializes this directly into the per-task JSON artifact, so
-    every field must be JSON-serializable and stable across schema versions.
-    """
-
-    harness: str
-    benchmark: str
-    task_id: str
-    plugins: list[str] = Field(default_factory=list)
-    mcp_servers: list[str] = Field(default_factory=list)
-    exit_code: int
-    duration_seconds: float
-    stdout: str = ""
-    stderr: str = ""
-    passed: bool | None = None  # None = no grader attached
-    tokens_input: int | None = None
-    tokens_output: int | None = None
-    tokens_total: int | None = None
-    cost_usd: float | None = None
-    tool_calls: dict[str, int] = Field(default_factory=dict)
-    error: str | None = None
 
 
 @dataclass

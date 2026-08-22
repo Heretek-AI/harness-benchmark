@@ -15,43 +15,73 @@ jobs:
   publish-report:
     runs-on: ubuntu-latest
     steps:
-      - name: Download report artifact and publish summary
-        uses: actions/github-script@v7
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Download all benchmark run artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const runId = context.payload.workflow_run.id;
-            core.info(`Processing benchmark report for completed workflow run: ${runId}`);
+          path: ./downloaded-artifacts
 
-            // List artifacts from the completed workflow run
-            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId,
-            });
+      - name: Generate and Publish Date-Labeled GitHub Issue Report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+          from core.types import BenchmarkReport, CellSummary, MetricSummary, ExecutionResult
+          from reporting.github_issue import GitHubIssuePublisher
 
-            const reportArtifact = artifacts.data.artifacts.find(
-              (art) => art.name === 'bench-report'
-            );
+          artifacts_root = Path("./downloaded-artifacts")
+          results = []
+          cell_summaries = []
+          run_id = f"gh-{os.environ.get('GITHUB_RUN_ID', 'ci')}"
 
-            if (!reportArtifact) {
-              core.info('No bench-report artifact found for run ' + runId);
-              return;
-            }
+          for res_file in sorted(artifacts_root.glob("**/result.json")):
+              try:
+                  data = json.loads(res_file.read_text())
+                  for s in data.get("summaries", []):
+                      sum_data = s["summary"]
+                      cell_summaries.append(CellSummary(
+                          harness=s["harness"],
+                          benchmark=s["benchmark"],
+                          plugins=s["plugins"],
+                          mcp_servers=s["mcp_servers"],
+                          summary=MetricSummary(**sum_data),
+                      ))
+                  for r in data.get("results", []):
+                      results.append(ExecutionResult(**r))
+              except Exception as e:
+                  print(f"Error parsing {res_file}: {e}")
 
-            core.info(`Found bench-report artifact (id: ${reportArtifact.id})`);
-            
-            const prs = context.payload.workflow_run.pull_requests;
-            if (prs && prs.length > 0) {
-              const prNumber = prs[0].number;
-              const commentBody = `### 🤖 Benchmark Run Completed (Run #${runId})\n\n` +
-                `Benchmark results have been published to the [Workflow Run Summary](${context.payload.workflow_run.html_url}).\n\n` +
-                `Artifacts retention: 90 days. Check the step summary for full per-harness metrics.`;
+          if not results:
+              print("No benchmark results found in artifacts.")
+              sys.exit(0)
 
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: commentBody,
-              });
-            }
+          report = BenchmarkReport(
+              run_id=run_id,
+              name="CI-Matrix-Evaluation",
+              config={"llm_model": os.environ.get("LLM_MODEL", "Standard Matrix")},
+              summaries=cell_summaries,
+              results=results,
+          )
+
+          issue_url = GitHubIssuePublisher.publish_issue(report)
+          if issue_url:
+              print(f"Published benchmark report to GitHub Issue: {issue_url}")
+          else:
+              print("Warning: Could not publish GitHub issue.")

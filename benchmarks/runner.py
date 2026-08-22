@@ -34,6 +34,7 @@ from agents import ADAPTERS, BaseAgentAdapter
 from agents.base import ExecutionResult
 from benchmarks import REGISTRY as BENCHMARKS
 from benchmarks import BaseBenchmark
+from core.logger import logger as bench_logger
 from metrics.collector import MetricCollector
 from metrics.report_generator import render_markdown
 from plugins import PluginLoader
@@ -120,14 +121,9 @@ class BenchmarkRunner:
         )
         logger.info("resolved %d cells to run", len(cells))
 
+        bench_logger.banner(f"Harness Benchmark 2.0: {self.config.name}")
         for harness, benchmark, plugins, mcp_servers in cells:
-            logger.info(
-                "running cell harness=%s benchmark=%s plugins=%s mcp=%s",
-                harness,
-                benchmark,
-                plugins,
-                mcp_servers,
-            )
+            bench_logger.cell_start(harness, benchmark, plugins, mcp_servers, self.config.tasks_limit or 0)
             cell_results = self._run_cell(harness, benchmark, plugins, mcp_servers, run_dir)
             report.results.extend(cell_results)
             self.metric_collector.reset()
@@ -194,6 +190,7 @@ class BenchmarkRunner:
                     cwd = cwd / task.workspace_subdir
                     cwd.mkdir(parents=True, exist_ok=True)
                 benchmark.pre_setup(cwd)
+                bench_logger.task_start(task.task_id, task.prompt)
                 result = adapter.execute_task(task.prompt, cwd, timeout=self.config.timeout_seconds)
                 result.benchmark = benchmark_name
                 result.task_id = task.task_id
@@ -211,6 +208,14 @@ class BenchmarkRunner:
                         result.tokens_output or 0,
                     )
                 results.append(result)
+                bench_logger.task_finish(
+                    task.task_id,
+                    bool(result.passed),
+                    result.duration_seconds,
+                    result.tokens_input,
+                    result.tokens_output,
+                    sum(result.tool_calls.values()),
+                )
                 # Per-task JSONL artifact for downstream drill-down.
                 with (run_dir / f"{harness_name}__{benchmark_name}__{task.task_id}.jsonl").open("a") as f:
                     f.write(result.model_dump_json() + "\n")
