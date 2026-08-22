@@ -123,7 +123,7 @@ class GeminiCLIAdapter(BaseAgentAdapter):
             )
 
     def _build_command(self, prompt: str, workspace_dir) -> list[str]:
-        return [self.cli_binary, "-p", prompt, "--yolo", "--output-format", "json"]
+        return [self.cli_binary, "-p", prompt, "--output-format", "json"]
 
     @staticmethod
     def resolve_cli() -> str | None:

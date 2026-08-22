@@ -56,7 +56,6 @@ def test_per_adapter_command_shapes() -> None:
         "gemini",
         "-p",
         "p",
-        "--yolo",
         "--output-format",
         "json",
     ]
